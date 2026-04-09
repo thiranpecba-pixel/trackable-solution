@@ -1,6 +1,0 @@
-# Cloudflare Pages — no build step needed, just deploy the folder directly
-# Upload the entire trackable-solution/ folder to Cloudflare Pages
-
-[build]
-  command = ""
-  publish = "."
