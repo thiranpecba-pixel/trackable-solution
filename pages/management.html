@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Management View — Trackable Solution</title>
+<link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">TS</div>
+      <div><div class="logo-label">Trackable Solution</div><div class="logo-sub">Management View</div></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Reports</div>
+      <button class="nav-item active" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
+      <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
+      <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sb-avatar" style="border-color:var(--purple);color:var(--purple)">?</div>
+        <div><div class="user-name" id="sb-name">Loading…</div><div class="user-role">Management</div></div>
+      </div>
+      <button class="btn-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Overview</div>
+        <div class="page-breadcrumb">Ceylon Business Appliances · Trackable Solution Trial — Read-only report</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn" onclick="generateReport()">⬇ Download report</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- OVERVIEW -->
+      <div id="sec-overview" class="section-panel">
+        <div class="metric-grid">
+          <div class="metric-card"><div class="metric-label">Total entries</div><div class="metric-value" id="m-total">—</div><div class="metric-sub">All feedback received</div></div>
+          <div class="metric-card"><div class="metric-label">Resolved</div><div class="metric-value" style="color:var(--accent)" id="m-done">—</div><div class="metric-sub">Successfully closed</div></div>
+          <div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value" style="color:var(--warn)" id="m-pending">—</div><div class="metric-sub">Awaiting action</div></div>
+          <div class="metric-card"><div class="metric-label">Resolution rate</div><div class="metric-value" style="color:var(--purple)" id="m-rate">—</div><div class="metric-sub">Overall completion</div></div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="section-hdr"><div><div class="section-title">Resolution rate by department</div><div class="section-sub">Trial period progress</div></div></div>
+          <div id="dept-bars"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-title mb-16">Feedback breakdown</div>
+            <div id="type-breakdown"></div>
+          </div>
+          <div class="card">
+            <div class="section-title mb-16">Priority breakdown</div>
+            <div id="priority-breakdown"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEPARTMENTS -->
+      <div id="sec-departments" class="section-panel" style="display:none">
+        <div class="dept-grid" id="dept-grid"></div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div id="sec-timeline" class="section-panel" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-title mb-16">Project phases</div>
+            <div class="timeline" id="timeline-list"></div>
+          </div>
+          <div class="card">
+            <div class="section-title mb-8">Overall trial progress</div>
+            <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="overall-pct">0%</div>
+            <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="overall-bar" style="width:0%;background:var(--accent)"></div></div>
+            <div class="text-sm text-muted mb-24" id="overall-sub"></div>
+            <div style="border-top:1px solid var(--border);padding-top:16px">
+              <div class="section-title mb-8">Feedback resolution</div>
+              <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="fb-pct">0%</div>
+              <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="fb-bar" style="width:0%;background:var(--purple)"></div></div>
+              <div class="text-sm text-muted" id="fb-sub"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+let allFeedback = [], allTimeline = [], currentUser = null;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = '../index.html'; return; }
+  const snap = await getDoc(doc(db, 'users', user.uid));
+  if (!snap.exists() || snap.data().role !== 'management') { window.location.href = '../index.html'; return; }
+  currentUser = { uid: user.uid, ...snap.data() };
+  document.getElementById('sb-name').textContent = currentUser.name || user.email;
+  document.getElementById('sb-avatar').textContent = initials(currentUser.name || user.email);
+  onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')), snap => {
+    allFeedback = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+  onSnapshot(query(collection(db, 'timeline'), orderBy('order')), snap => {
+    allTimeline = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTimeline();
+  });
+});
+
+function renderAll() {
+  const total = allFeedback.length;
+  const done = allFeedback.filter(f => f.status === 'resolved').length;
+  const pend = allFeedback.filter(f => f.status === 'pending').length;
+  const rate = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-done').textContent = done;
+  document.getElementById('m-pending').textContent = pend;
+  document.getElementById('m-rate').textContent = rate + '%';
+  document.getElementById('fb-pct').textContent = rate + '%';
+  document.getElementById('fb-bar').style.width = rate + '%';
+  document.getElementById('fb-sub').textContent = `${done} of ${total} feedback entries resolved`;
+  renderDeptBars();
+  renderTypeBreakdown();
+  renderPriorityBreakdown();
+  renderDeptGrid();
+}
+
+function renderDeptBars() {
+  const el = document.getElementById('dept-bars');
+  const depts = DEPARTMENTS.filter(d => allFeedback.some(f => f.dept === d));
+  if (!depts.length) { el.innerHTML = '<div class="text-sm text-muted">No data yet</div>'; return; }
+  el.innerHTML = depts.map(d => {
+    const items = allFeedback.filter(f => f.dept === d);
+    const done = items.filter(f => f.status === 'resolved').length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${deptColor(d)}"></div>
+          <span style="font-size:14px;font-weight:500">${d}</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span class="text-sm text-muted">${items.length} entries</span>
+          <span style="font-size:13px;font-weight:600;color:${color};font-family:'DM Mono',monospace">${pct}%</span>
+        </div>
+      </div>
+      <div class="progress-bar" style="height:7px"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderTypeBreakdown() {
+  const el = document.getElementById('type-breakdown');
+  const types = ['bug', 'suggestion', 'doubt'];
+  el.innerHTML = types.map(t => {
+    const count = allFeedback.filter(f => f.type === t).length;
+    const pct = allFeedback.length ? Math.round(count / allFeedback.length * 100) : 0;
+    const label = FEEDBACK_TYPES[t]?.label || t;
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      ${badge(t, FEEDBACK_TYPES)}
+      <div class="progress-bar" style="flex:1;height:6px"><div class="progress-fill" style="width:${pct}%;background:${t==='bug'?'var(--danger)':t==='suggestion'?'var(--purple)':'var(--muted)'}"></div></div>
+      <span style="font-size:13px;font-weight:500;font-family:'DM Mono',monospace;min-width:28px;text-align:right">${count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderPriorityBreakdown() {
+  const el = document.getElementById('priority-breakdown');
+  const prios = ['critical','high','medium','low'];
+  const colors = { critical:'var(--danger)', high:'var(--warn)', medium:'var(--accent2)', low:'var(--muted)' };
+  el.innerHTML = prios.map(p => {
+    const count = allFeedback.filter(f => (f.priority || 'medium') === p).length;
+    const pct = allFeedback.length ? Math.round(count / allFeedback.length * 100) : 0;
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span style="font-size:12px;font-weight:500;color:${colors[p]};min-width:54px;text-transform:uppercase">${p}</span>
+      <div class="progress-bar" style="flex:1;height:6px"><div class="progress-fill" style="width:${pct}%;background:${colors[p]}"></div></div>
+      <span style="font-size:13px;font-weight:500;font-family:'DM Mono',monospace;min-width:28px;text-align:right">${count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderDeptGrid() {
+  const el = document.getElementById('dept-grid');
+  el.innerHTML = DEPARTMENTS.map(d => {
+    const items = allFeedback.filter(f => f.dept === d);
+    const done = items.filter(f => f.status === 'resolved').length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    return `<div class="dept-card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${deptColor(d)}"></div>
+        <div class="dept-name" style="margin:0">${d}</div>
+      </div>
+      <div class="dept-stats">
+        <div><span>${items.length}</span> total</div>
+        <div><span style="color:var(--danger)">${items.filter(f=>f.type==='bug').length}</span> bugs</div>
+        <div><span style="color:var(--accent)">${done}</span> resolved</div>
+        <div><span style="color:var(--warn)">${items.filter(f=>f.status==='pending').length}</span> pending</div>
+      </div>
+      <div class="progress-bar mb-4"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="text-sm text-muted">${pct}% resolved</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTimeline() {
+  const el = document.getElementById('timeline-list');
+  if (!allTimeline.length) { el.innerHTML = '<div class="text-sm text-muted">No phases added yet</div>'; return; }
+  const done = allTimeline.filter(p => p.status === 'done').length;
+  const pct = Math.round(done / allTimeline.length * 100);
+  document.getElementById('overall-pct').textContent = pct + '%';
+  document.getElementById('overall-bar').style.width = pct + '%';
+  document.getElementById('overall-sub').textContent = `${done} of ${allTimeline.length} phases complete`;
+  el.innerHTML = allTimeline.map(p => `
+    <div class="tl-item">
+      <div class="tl-dot ${p.status}"></div>
+      <div class="tl-body">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="tl-title">${p.name}</span>
+          ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+        </div>
+        <div class="tl-date">${p.date}</div>
+        <div class="tl-desc">${p.description}</div>
+      </div>
+    </div>`).join('');
+}
+
+window.showSection = function(sec, el) {
+  document.querySelectorAll('.section-panel').forEach(s => s.style.display = 'none');
+  document.getElementById('sec-' + sec).style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  const titles = { overview:'Overview', departments:'Departments', timeline:'Timeline' };
+  document.getElementById('page-title').textContent = titles[sec];
+};
+
+window.generateReport = function() {
+  const total = allFeedback.length;
+  const done = allFeedback.filter(f => f.status === 'resolved').length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const phases = allTimeline.filter(p => p.status === 'done').length;
+  const content = `TRACKABLE SOLUTION — MANAGEMENT REPORT
+Ceylon Business Appliances
+Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXECUTIVE SUMMARY
+Total feedback entries: ${total}
+Resolved: ${done} (${pct}%)
+Pending: ${allFeedback.filter(f=>f.status==='pending').length}
+In progress: ${allFeedback.filter(f=>f.status==='in-progress').length}
+
+TIMELINE: ${phases} of ${allTimeline.length} phases complete
+
+DEPARTMENT PERFORMANCE
+${'─'.repeat(45)}
+${DEPARTMENTS.map(d => {
+  const items = allFeedback.filter(f => f.dept === d);
+  if (!items.length) return `${d.padEnd(20)} No entries`;
+  const r = items.filter(f => f.status === 'resolved').length;
+  const p = Math.round(r/items.length*100);
+  return `${d.padEnd(20)} ${r}/${items.length} resolved (${p}%)`;
+}).join('\n')}
+
+TIMELINE PHASES
+${'─'.repeat(45)}
+${allTimeline.map(p => `[${p.status==='done'?'✓':p.status==='wip'?'→':'○'}] ${p.name} — ${p.date}`).join('\n')}
+`;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `trackable-management-report-${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+};
+
+window.doSignOut = async () => { await signOut(auth); window.location.href = '../index.html'; };
+</script>
+</body>
+</html>

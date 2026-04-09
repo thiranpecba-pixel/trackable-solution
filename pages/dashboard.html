@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dashboard — Trackable Solution</title>
+<link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">TS</div>
+      <div><div class="logo-label">Trackable Solution</div><div class="logo-sub">Coordinator View</div></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Main</div>
+      <button class="nav-item active" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
+      <button class="nav-item" onclick="showSection('feedback',this)"><span class="icon">◎</span> Feedback Log</button>
+      <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
+      <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
+      <div class="nav-label" style="margin-top:16px">Admin</div>
+      <button class="nav-item" onclick="showSection('users',this)"><span class="icon">◉</span> Manage Users</button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sb-avatar">?</div>
+        <div><div class="user-name" id="sb-name">Loading…</div><div class="user-role">Coordinator</div></div>
+      </div>
+      <button class="btn-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Overview</div>
+        <div class="page-breadcrumb">Ceylon Business Appliances · Trackable Solution Trial</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Feedback</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div id="alert-area"></div>
+
+      <!-- ══ OVERVIEW ══ -->
+      <div id="sec-overview" class="section-panel">
+        <div class="metric-grid" id="metric-grid">
+          <div class="metric-card"><div class="metric-label">Total entries</div><div class="metric-value" id="m-total">—</div><div class="metric-sub">All feedback</div></div>
+          <div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value" style="color:var(--warn)" id="m-pending">—</div><div class="metric-sub">Awaiting IT</div></div>
+          <div class="metric-card"><div class="metric-label">In progress</div><div class="metric-value" style="color:var(--accent2)" id="m-inprog">—</div><div class="metric-sub">IT working on</div></div>
+          <div class="metric-card"><div class="metric-label">Resolved</div><div class="metric-value" style="color:var(--accent)" id="m-done">—</div><div class="metric-sub">Completed</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-hdr"><div><div class="section-title">Recent feedback</div><div class="section-sub">Latest entries across all departments</div></div></div>
+            <div id="recent-list"><div class="empty-state"><div class="icon">◎</div><p>No feedback yet</p></div></div>
+          </div>
+          <div class="card">
+            <div class="section-hdr"><div><div class="section-title">Department progress</div><div class="section-sub">Resolution rate by dept</div></div></div>
+            <div id="dept-progress-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ FEEDBACK LOG ══ -->
+      <div id="sec-feedback" class="section-panel" style="display:none">
+        <div class="toolbar">
+          <input class="search-input" id="search-input" placeholder="Search feedback, department, worker…" oninput="renderFeedback()">
+          <select class="form-select" style="width:auto" id="dept-filter" onchange="renderFeedback()">
+            <option value="">All departments</option>
+          </select>
+        </div>
+        <div class="toolbar" style="margin-top:-6px">
+          <button class="filter-chip active" onclick="setStatusFilter('all',this)">All</button>
+          <button class="filter-chip" onclick="setStatusFilter('pending',this)">Pending</button>
+          <button class="filter-chip" onclick="setStatusFilter('in-progress',this)">In progress</button>
+          <button class="filter-chip" onclick="setStatusFilter('resolved',this)">Resolved</button>
+          <button class="filter-chip" onclick="setTypeFilter('bug',this)">Bugs</button>
+          <button class="filter-chip" onclick="setTypeFilter('suggestion',this)">Suggestions</button>
+          <button class="filter-chip" onclick="setTypeFilter('doubt',this)">Doubts</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div id="feedback-list"></div>
+        </div>
+      </div>
+
+      <!-- ══ DEPARTMENTS ══ -->
+      <div id="sec-departments" class="section-panel" style="display:none">
+        <div class="dept-grid" id="dept-grid"></div>
+      </div>
+
+      <!-- ══ TIMELINE ══ -->
+      <div id="sec-timeline" class="section-panel" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-hdr">
+              <div><div class="section-title">Trial & launch phases</div><div class="section-sub">Project milestone tracker</div></div>
+              <button class="btn btn-sm" onclick="openTimelineModal()">+ Add phase</button>
+            </div>
+            <div class="timeline" id="timeline-list"></div>
+          </div>
+          <div>
+            <div class="card mb-16">
+              <div class="section-title mb-8">Overall completion</div>
+              <div style="font-size:36px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px" id="overall-pct">0%</div>
+              <div class="progress-bar mb-8"><div class="progress-fill" id="overall-bar" style="width:0%;background:var(--accent)"></div></div>
+              <div class="text-sm text-muted" id="overall-sub"></div>
+            </div>
+            <div class="card">
+              <div class="section-title mb-8">Generate report</div>
+              <div class="text-sm text-muted mb-16">Share progress summary with management and workers</div>
+              <button class="btn btn-primary w-full" onclick="generateReport()">Download progress report</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ USERS ══ -->
+      <div id="sec-users" class="section-panel" style="display:none">
+        <div class="card mb-16">
+          <div class="section-hdr">
+            <div><div class="section-title">Create user account</div><div class="section-sub">Add coordinators, IT developers, or management users</div></div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Full name</label><input class="form-input" id="new-name" placeholder="e.g. Kamal Perera"></div>
+            <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="new-email" type="email" placeholder="user@ceylonba.com"></div>
+            <div class="form-group"><label class="form-label">Role</label>
+              <select class="form-select" id="new-role">
+                <option value="coordinator">Coordinator</option>
+                <option value="developer">IT Developer</option>
+                <option value="management">Management</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Temporary password</label><input class="form-input" id="new-pass" type="password" placeholder="Min 6 characters"></div>
+          </div>
+          <button class="btn btn-primary" onclick="createUser()">Create account</button>
+        </div>
+        <div class="card">
+          <div class="section-title mb-16">All users</div>
+          <div id="users-list"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD FEEDBACK MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Add feedback entry</h3><button class="modal-close" onclick="closeAddModal()">×</button></div>
+    <div class="form-group"><label class="form-label">Department</label>
+      <select class="form-select" id="f-dept"><option value="">Select department…</option></select></div>
+    <div class="form-group"><label class="form-label">Worker name</label><input class="form-input" id="f-name" placeholder="e.g. Nimal Perera"></div>
+    <div class="form-group"><label class="form-label">Type</label>
+      <select class="form-select" id="f-type">
+        <option value="doubt">Doubt / Question</option>
+        <option value="suggestion">Suggestion</option>
+        <option value="bug">Bug / Error</option>
+      </select></div>
+    <div class="form-group"><label class="form-label">Priority</label>
+      <select class="form-select" id="f-priority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select></div>
+    <div class="form-group"><label class="form-label">Description</label>
+      <textarea class="form-textarea" id="f-desc" rows="4" placeholder="Describe the issue, doubt, or suggestion in detail…"></textarea></div>
+    <div id="modal-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitFeedback()">Submit & notify IT</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE MODAL -->
+<div class="modal-overlay" id="tl-modal">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Add timeline phase</h3><button class="modal-close" onclick="document.getElementById('tl-modal').classList.remove('open')">×</button></div>
+    <div class="form-group"><label class="form-label">Phase name</label><input class="form-input" id="tl-name" placeholder="e.g. UAT & sign-off"></div>
+    <div class="form-group"><label class="form-label">Date range</label><input class="form-input" id="tl-date" placeholder="e.g. May 1 – May 10, 2025"></div>
+    <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="tl-desc" placeholder="Brief description of this phase"></div>
+    <div class="form-group"><label class="form-label">Status</label>
+      <select class="form-select" id="tl-status">
+        <option value="plan">Planned</option>
+        <option value="wip">In progress</option>
+        <option value="done">Completed</option>
+      </select></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('tl-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitTimeline()">Add phase</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase + App Script -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc,
+  onSnapshot, updateDoc, serverTimestamp, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig, emailjsConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
+
+// EmailJS
+const EJS = document.createElement('script');
+EJS.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+document.head.appendChild(EJS);
+EJS.onload = () => emailjs.init(emailjsConfig.publicKey);
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [];
+let statusFilter = 'all', typeFilter = '';
+
+// ── Auth guard ──
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = '../index.html'; return; }
+  const snap = await getDoc(doc(db, 'users', user.uid));
+  if (!snap.exists() || snap.data().role !== 'coordinator') { window.location.href = '../index.html'; return; }
+  currentUser = { uid: user.uid, ...snap.data() };
+  document.getElementById('sb-name').textContent = currentUser.name || user.email;
+  document.getElementById('sb-avatar').textContent = initials(currentUser.name || user.email);
+  initApp();
+});
+
+function initApp() {
+  // Populate dept dropdowns
+  DEPARTMENTS.forEach(d => {
+    document.getElementById('f-dept').innerHTML += `<option value="${d}">${d}</option>`;
+    document.getElementById('dept-filter').innerHTML += `<option value="${d}">${d}</option>`;
+  });
+  // Listen to feedback
+  onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')), snap => {
+    allFeedback = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+  // Listen to timeline
+  onSnapshot(query(collection(db, 'timeline'), orderBy('order')), snap => {
+    allTimeline = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTimeline();
+  });
+  // Load users
+  loadUsers();
+}
+
+function renderAll() {
+  updateMetrics();
+  renderRecent();
+  renderFeedback();
+  renderDeptProgress();
+  renderDeptGrid();
+}
+
+function updateMetrics() {
+  document.getElementById('m-total').textContent = allFeedback.length;
+  document.getElementById('m-pending').textContent = allFeedback.filter(f => f.status === 'pending').length;
+  document.getElementById('m-inprog').textContent = allFeedback.filter(f => f.status === 'in-progress').length;
+  document.getElementById('m-done').textContent = allFeedback.filter(f => f.status === 'resolved').length;
+}
+
+function renderRecent() {
+  const el = document.getElementById('recent-list');
+  const items = allFeedback.slice(0, 5);
+  if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="icon">◎</div><p>No feedback yet</p></div>'; return; }
+  el.innerHTML = items.map(f => `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${deptColor(f.dept)};margin-top:5px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.description || ''}</div>
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface3);color:var(--muted)">${f.dept}</span>
+          ${badge(f.type, FEEDBACK_TYPES)} ${badge(f.status, STATUS)}
+          <span class="text-sm text-muted">${f.workerName} · ${formatDate(f.createdAt)}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+window.renderFeedback = function() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const dept = document.getElementById('dept-filter').value;
+  let list = allFeedback.filter(f => {
+    const matchStatus = statusFilter === 'all' || f.status === statusFilter;
+    const matchType = !typeFilter || f.type === typeFilter;
+    const matchDept = !dept || f.dept === dept;
+    const matchSearch = !search || (f.description||'').toLowerCase().includes(search)
+      || (f.dept||'').toLowerCase().includes(search)
+      || (f.workerName||'').toLowerCase().includes(search);
+    return matchStatus && matchType && matchDept && matchSearch;
+  });
+
+  const el = document.getElementById('feedback-list');
+  if (!list.length) { el.innerHTML = '<div class="empty-state"><div class="icon">◎</div><p>No matching entries</p></div>'; return; }
+  el.innerHTML = list.map(f => `
+    <div style="padding:16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;margin-bottom:6px">${f.description || ''}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface3);color:var(--muted)">${f.dept}</span>
+            ${badge(f.type, FEEDBACK_TYPES)} ${badge(f.status, STATUS)}
+            <span class="badge" style="background:var(--surface3);color:${f.priority==='critical'?'var(--danger)':f.priority==='high'?'var(--warn)':'var(--muted)'}">
+              ${(f.priority||'medium').toUpperCase()}
+            </span>
+            <span class="text-sm text-muted">${f.workerName} · ${formatDate(f.createdAt)}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+          <select class="form-select" style="width:auto;font-size:12px;padding:4px 8px" onchange="updateStatus('${f.id}',this.value)">
+            <option value="pending" ${f.status==='pending'?'selected':''}>Pending</option>
+            <option value="in-progress" ${f.status==='in-progress'?'selected':''}>In progress</option>
+            <option value="resolved" ${f.status==='resolved'?'selected':''}>Resolved</option>
+          </select>
+        </div>
+      </div>
+      ${f.itReply
+        ? `<div class="it-reply"><div class="it-reply-label">IT Developer reply</div><div class="it-reply-text">${f.itReply}</div></div>`
+        : `<div class="awaiting-reply">⏳ Awaiting IT developer response…</div>`}
+    </div>`).join('');
+};
+
+function renderDeptProgress() {
+  const el = document.getElementById('dept-progress-list');
+  const depts = [...new Set(allFeedback.map(f => f.dept))].sort();
+  if (!depts.length) { el.innerHTML = '<div class="text-sm text-muted">No data yet</div>'; return; }
+  el.innerHTML = depts.map(d => {
+    const items = allFeedback.filter(f => f.dept === d);
+    const done = items.filter(f => f.status === 'resolved').length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500">${d}</span>
+        <span style="font-size:12px;color:var(--muted)">${done}/${items.length} resolved</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderDeptGrid() {
+  const el = document.getElementById('dept-grid');
+  const depts = DEPARTMENTS;
+  el.innerHTML = depts.map(d => {
+    const items = allFeedback.filter(f => f.dept === d);
+    const done = items.filter(f => f.status === 'resolved').length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    const bugs = items.filter(f => f.type === 'bug').length;
+    return `<div class="dept-card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${deptColor(d)}"></div>
+        <div class="dept-name" style="margin:0">${d}</div>
+      </div>
+      <div class="dept-stats">
+        <div><span>${items.length}</span> total</div>
+        <div style="color:var(--warn)"><span style="color:var(--warn)">${items.filter(f=>f.status==='pending').length}</span> pending</div>
+        <div style="color:var(--danger)"><span style="color:var(--danger)">${bugs}</span> bugs</div>
+        <div style="color:var(--accent)"><span style="color:var(--accent)">${done}</span> resolved</div>
+      </div>
+      <div class="progress-bar mb-4"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="text-sm text-muted">${pct}% resolved</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTimeline() {
+  const el = document.getElementById('timeline-list');
+  if (!allTimeline.length) { el.innerHTML = '<div class="text-sm text-muted">No phases added yet</div>'; return; }
+  const done = allTimeline.filter(p => p.status === 'done').length;
+  const pct = Math.round(done / allTimeline.length * 100);
+  document.getElementById('overall-pct').textContent = pct + '%';
+  document.getElementById('overall-bar').style.width = pct + '%';
+  document.getElementById('overall-sub').textContent = `${done} of ${allTimeline.length} phases complete`;
+  el.innerHTML = allTimeline.map(p => `
+    <div class="tl-item">
+      <div class="tl-dot ${p.status}"></div>
+      <div class="tl-body">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="tl-title">${p.name}</span>
+          ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+        </div>
+        <div class="tl-date">${p.date}</div>
+        <div class="tl-desc">${p.description}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select class="form-select" style="width:auto;font-size:12px;padding:4px 8px" onchange="updateTimelineStatus('${p.id}',this.value)">
+          <option value="plan" ${p.status==='plan'?'selected':''}>Planned</option>
+          <option value="wip" ${p.status==='wip'?'selected':''}>In progress</option>
+          <option value="done" ${p.status==='done'?'selected':''}>Done</option>
+        </select>
+      </div>
+    </div>`).join('');
+}
+
+async function loadUsers() {
+  const snap = await getDocs(collection(db, 'users'));
+  allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderUsers();
+}
+
+function renderUsers() {
+  const el = document.getElementById('users-list');
+  if (!allUsers.length) { el.innerHTML = '<div class="text-sm text-muted">No users yet</div>'; return; }
+  el.innerHTML = `<table class="data-table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+    <tbody>${allUsers.map(u => `
+      <tr>
+        <td style="font-weight:500">${u.name || '—'}</td>
+        <td style="color:var(--muted)">${u.email || '—'}</td>
+        <td>${badge(u.role, {
+          coordinator: {label:'Coordinator', color:'badge-coordinator'},
+          developer: {label:'IT Developer', color:'badge-developer'},
+          management: {label:'Management', color:'badge-management'}
+        })}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ── Actions ──
+window.updateStatus = async (id, status) => {
+  await updateDoc(doc(db, 'feedback', id), { status, updatedAt: serverTimestamp() });
+};
+
+window.updateTimelineStatus = async (id, status) => {
+  await updateDoc(doc(db, 'timeline', id), { status });
+};
+
+window.openAddModal = () => document.getElementById('add-modal').classList.add('open');
+window.closeAddModal = () => document.getElementById('add-modal').classList.remove('open');
+window.openTimelineModal = () => document.getElementById('tl-modal').classList.add('open');
+
+window.submitFeedback = async function() {
+  const dept = document.getElementById('f-dept').value;
+  const name = document.getElementById('f-name').value.trim();
+  const type = document.getElementById('f-type').value;
+  const priority = document.getElementById('f-priority').value;
+  const desc = document.getElementById('f-desc').value.trim();
+  const alertEl = document.getElementById('modal-alert');
+  if (!dept || !name || !desc) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Please fill all fields.</div>'; return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const ref = await addDoc(collection(db, 'feedback'), {
+      dept, workerName: name, type, priority,
+      description: desc, status: 'pending', itReply: '',
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      addedBy: currentUser.uid
+    });
+    // Send email via EmailJS
+    await emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId, {
+      to_email: (await import('../js/config.js')).IT_DEVELOPER_EMAILS.join(', '),
+      dept, worker_name: name, type, priority, description: desc,
+      feedback_id: ref.id,
+      dashboard_url: window.location.origin + '/pages/developer.html',
+      submitted_by: currentUser.name || 'Coordinator'
+    });
+    closeAddModal();
+    document.getElementById('f-dept').value = '';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-desc').value = '';
+    showAlert('Feedback submitted and IT team notified!', 'success');
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Submit & notify IT';
+};
+
+window.submitTimeline = async function() {
+  const name = document.getElementById('tl-name').value.trim();
+  const date = document.getElementById('tl-date').value.trim();
+  const desc = document.getElementById('tl-desc').value.trim();
+  const status = document.getElementById('tl-status').value;
+  if (!name || !date) return;
+  await addDoc(collection(db, 'timeline'), { name, date, description: desc, status, order: allTimeline.length });
+  document.getElementById('tl-modal').classList.remove('open');
+};
+
+window.createUser = async function() {
+  const name = document.getElementById('new-name').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const role = document.getElementById('new-role').value;
+  const pass = document.getElementById('new-pass').value;
+  if (!name || !email || !pass) { showAlert('Fill all user fields.', 'danger'); return; }
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db, 'users', cred.user.uid), { name, email, role, createdAt: serverTimestamp() });
+    showAlert(`User ${name} created successfully!`, 'success');
+    await loadUsers();
+    document.getElementById('new-name').value = '';
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-pass').value = '';
+  } catch(e) { showAlert('Error: ' + e.message, 'danger'); }
+};
+
+window.generateReport = function() {
+  const total = allFeedback.length;
+  const done = allFeedback.filter(f => f.status === 'resolved').length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const phases = allTimeline.filter(p => p.status === 'done').length;
+  const content = `TRACKABLE SOLUTION — PROGRESS REPORT
+Ceylon Business Appliances
+Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SUMMARY
+Total feedback entries: ${total}
+Resolved: ${done} (${pct}%)
+Pending: ${allFeedback.filter(f=>f.status==='pending').length}
+In progress: ${allFeedback.filter(f=>f.status==='in-progress').length}
+
+TIMELINE: ${phases} of ${allTimeline.length} phases complete
+
+DEPARTMENT BREAKDOWN
+${DEPARTMENTS.map(d => {
+  const items = allFeedback.filter(f => f.dept === d);
+  const r = items.filter(f => f.status === 'resolved').length;
+  const p2 = items.length ? Math.round(r/items.length*100) : 0;
+  return `  ${d}: ${items.length} entries — ${r} resolved (${p2}%)`;
+}).join('\n')}
+
+FEEDBACK DETAILS
+${allFeedback.map(f => `[${f.status.toUpperCase()}] [${f.type.toUpperCase()}] ${f.dept} — ${f.workerName}
+  ${f.description}${f.itReply ? '\n  IT Reply: ' + f.itReply : ''}`).join('\n\n')}
+`;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `trackable-report-${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+};
+
+window.doSignOut = async () => { await signOut(auth); window.location.href = '../index.html'; };
+
+window.showSection = function(sec, el) {
+  document.querySelectorAll('.section-panel').forEach(s => s.style.display = 'none');
+  document.getElementById('sec-' + sec).style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  const titles = { overview:'Overview', feedback:'Feedback Log', departments:'Departments', timeline:'Timeline', users:'Manage Users' };
+  document.getElementById('page-title').textContent = titles[sec] || sec;
+};
+
+window.setStatusFilter = function(val, el) {
+  statusFilter = val; typeFilter = '';
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderFeedback();
+};
+window.setTypeFilter = function(val, el) {
+  typeFilter = val; statusFilter = 'all';
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderFeedback();
+};
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alert-area');
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => el.innerHTML = '', 4000);
+}
+</script>
+</body>
+</html>
