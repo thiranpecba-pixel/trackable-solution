@@ -109,9 +109,43 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot, updateDoc, serverTimestamp, query, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+  authDomain: "trackable-progress.firebaseapp.com",
+  projectId: "trackable-progress",
+  storageBucket: "trackable-progress.firebasestorage.app",
+  messagingSenderId: "961877401670",
+  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+};
+
+const FEEDBACK_TYPES = {
+  doubt:      { label: 'Doubt',      color: 'badge-doubt'      },
+  suggestion: { label: 'Suggestion', color: 'badge-suggestion' },
+  bug:        { label: 'Bug',        color: 'badge-bug'        }
+};
+
+const STATUS = {
+  pending:       { label: 'Pending',     color: 'badge-pending'  },
+  'in-progress': { label: 'In progress', color: 'badge-progress' },
+  resolved:      { label: 'Resolved',    color: 'badge-resolved' }
+};
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function badge(type, map) {
+  const item = map[type] || { label: type, color: 'badge-doubt' };
+  return `<span class="badge ${item.color}">${item.label}</span>`;
+}
+
+function initials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -127,7 +161,14 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = { uid: user.uid, ...snap.data() };
   document.getElementById('sb-name').textContent = currentUser.name || user.email;
   document.getElementById('sb-avatar').textContent = initials(currentUser.name || user.email);
-  DEPARTMENTS.forEach(d => document.getElementById('dept-filter').innerHTML += `<option value="${d}">${d}</option>`);
+
+  // Load departments from Firestore into filter dropdown
+  onSnapshot(collection(db, 'departments'), snap => {
+    const depts = snap.docs.map(d => d.data().name);
+    const filter = document.getElementById('dept-filter');
+    filter.innerHTML = '<option value="">All departments</option>' +
+      depts.map(d => `<option value="${d}">${d}</option>`).join('');
+  });
   onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')), snap => {
     allFeedback = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     updateCounters();
