@@ -26,7 +26,7 @@ export const emailjsConfig = {
 // ════════════════════════════════════════════
 export const IT_DEVELOPER_EMAILS = [
   "thiranperera29@gmail.com",
-  "developer2@ceylonba.com"
+  "chathura.hewage11@gmail.com"
 ];
 
 // ════════════════════════════════════════════
