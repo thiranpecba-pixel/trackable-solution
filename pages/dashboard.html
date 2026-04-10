@@ -203,7 +203,7 @@
 <!-- TIMELINE MODAL -->
 <div class="modal-overlay" id="tl-modal">
   <div class="modal">
-    <div class="modal-hdr"><h3>Add timeline phase</h3><button class="modal-close" onclick="document.getElementById('tl-modal').classList.remove('open')">×</button></div>
+    <div class="modal-hdr"><h3 id="tl-modal-title">Add timeline phase</h3><button class="modal-close" onclick="closeTimelineModal()">×</button></div>
     <div class="form-group"><label class="form-label">Phase name</label><input class="form-input" id="tl-name" placeholder="e.g. UAT & sign-off"></div>
     <div class="form-group"><label class="form-label">Date range</label><input class="form-input" id="tl-date" placeholder="e.g. May 1 – May 10, 2025"></div>
     <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="tl-desc" placeholder="Brief description of this phase"></div>
@@ -214,8 +214,8 @@
         <option value="done">Completed</option>
       </select></div>
     <div class="modal-footer">
-      <button class="btn" onclick="document.getElementById('tl-modal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitTimeline()">Add phase</button>
+      <button class="btn" onclick="closeTimelineModal()">Cancel</button>
+      <button class="btn btn-primary" id="tl-submit-btn" onclick="submitTimeline()">Add phase</button>
     </div>
   </div>
 </div>
@@ -270,7 +270,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, emailjsConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
 
 window.toggleTheme = function() {
@@ -295,7 +295,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [];
-let statusFilter = 'all', typeFilter = '';
+let statusFilter = 'all', typeFilter = '', editingTimelineId = null;
 
 // ── Auth guard ──
 onAuthStateChanged(auth, async (user) => {
@@ -508,6 +508,7 @@ function renderTimeline() {
           <option value="wip" ${p.status==='wip'?'selected':''}>In progress</option>
           <option value="done" ${p.status==='done'?'selected':''}>Done</option>
         </select>
+        <button class="btn btn-sm" style="color:var(--accent2);padding:2px 8px" onclick="editTimeline('${p.id}')">✎</button>
         <button class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="deleteTimeline('${p.id}')">✕</button>
       </div>
     </div>`).join('');
@@ -551,7 +552,34 @@ window.closeAddModal = () => {
   document.getElementById('subservice-group').style.display = 'none';
   document.getElementById('f-subservice').innerHTML = '<option value="">Select sub-service…</option>';
 };
-window.openTimelineModal = () => document.getElementById('tl-modal').classList.add('open');
+window.openTimelineModal = () => {
+  editingTimelineId = null;
+  document.getElementById('tl-modal-title').textContent = 'Add timeline phase';
+  document.getElementById('tl-submit-btn').textContent = 'Add phase';
+  document.getElementById('tl-name').value = '';
+  document.getElementById('tl-date').value = '';
+  document.getElementById('tl-desc').value = '';
+  document.getElementById('tl-status').value = 'plan';
+  document.getElementById('tl-modal').classList.add('open');
+};
+
+window.closeTimelineModal = () => {
+  document.getElementById('tl-modal').classList.remove('open');
+  editingTimelineId = null;
+};
+
+window.editTimeline = function(id) {
+  const p = allTimeline.find(x => x.id === id);
+  if (!p) return;
+  editingTimelineId = id;
+  document.getElementById('tl-modal-title').textContent = 'Edit timeline phase';
+  document.getElementById('tl-submit-btn').textContent = 'Save changes';
+  document.getElementById('tl-name').value = p.name || '';
+  document.getElementById('tl-date').value = p.date || '';
+  document.getElementById('tl-desc').value = p.description || '';
+  document.getElementById('tl-status').value = p.status || 'plan';
+  document.getElementById('tl-modal').classList.add('open');
+};
 
 window.submitFeedback = async function() {
   const dept = document.getElementById('f-dept').value;
@@ -598,8 +626,14 @@ window.submitTimeline = async function() {
   const desc = document.getElementById('tl-desc').value.trim();
   const status = document.getElementById('tl-status').value;
   if (!name || !date) return;
-  await addDoc(collection(db, 'timeline'), { name, date, description: desc, status, order: allTimeline.length });
-  document.getElementById('tl-modal').classList.remove('open');
+  if (editingTimelineId) {
+    await updateDoc(doc(db, 'timeline', editingTimelineId), { name, date, description: desc, status });
+    showAlert('Phase updated successfully!', 'success');
+  } else {
+    await addDoc(collection(db, 'timeline'), { name, date, description: desc, status, order: allTimeline.length });
+    showAlert('Phase added!', 'success');
+  }
+  closeTimelineModal();
 };
 
 window.createUser = async function() {
