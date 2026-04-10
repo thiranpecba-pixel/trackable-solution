@@ -3,10 +3,6 @@
 // Ceylon Business Appliances
 // ══════════════════════════════════════════
 
-// ════════════════════════════════════════════
-// 🔧 REPLACE THESE WITH YOUR FIREBASE CONFIG
-// Firebase Console → Project Settings → Your apps → Web app
-// ════════════════════════════════════════════
 export const firebaseConfig = {
   apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
   authDomain: "trackable-progress.firebaseapp.com",
@@ -18,41 +14,36 @@ export const firebaseConfig = {
 
 // ════════════════════════════════════════════
 // 🔧 REPLACE THESE WITH YOUR EMAILJS KEYS
-// From: emailjs.com → Dashboard → Account → API Keys & Email Services
 // ════════════════════════════════════════════
 export const emailjsConfig = {
-  publicKey: "M0fN-ZhFBMo2K-psq",    // Account → General → Public Key
-  serviceId: "service_z6bjou4",    // Email Services → your service ID
-  templateId: "template_s023zsn"  // Email Templates → your template ID
+  publicKey: "M0fN-ZhFBMo2K-psq",
+  serviceId: "service_z6bjou4",
+  templateId: "template_s023zsn"
 };
 
 // ════════════════════════════════════════════
 // 🔧 IT DEVELOPER EMAIL ADDRESSES
-// All IT developers who should be notified of new feedback
 // ════════════════════════════════════════════
 export const IT_DEVELOPER_EMAILS = [
-  "thiranperera29@gmail.com",  // Replace with actual IT dev emails
+  "thiranperera29@gmail.com",
   "developer2@ceylonba.com"
 ];
 
 // ════════════════════════════════════════════
 // App constants
 // ════════════════════════════════════════════
-export const DEPARTMENTS = [
-  'Sales', 'Finance', 'HR', 'Warehouse',
-  'IT', 'Admin', 'Customer Service', 'Logistics', 'Marketing'
-];
+export const DEPARTMENTS = [];
 
 export const FEEDBACK_TYPES = {
-  doubt: { label: 'Doubt', color: 'badge-doubt' },
+  doubt:      { label: 'Doubt',      color: 'badge-doubt'      },
   suggestion: { label: 'Suggestion', color: 'badge-suggestion' },
-  bug: { label: 'Bug', color: 'badge-bug' }
+  bug:        { label: 'Bug',        color: 'badge-bug'        }
 };
 
 export const STATUS = {
-  pending: { label: 'Pending', color: 'badge-pending' },
+  pending:     { label: 'Pending',     color: 'badge-pending'  },
   'in-progress': { label: 'In progress', color: 'badge-progress' },
-  resolved: { label: 'Resolved', color: 'badge-resolved' }
+  resolved:    { label: 'Resolved',   color: 'badge-resolved' }
 };
 
 // ════════════════════════════════════════════
@@ -92,20 +83,63 @@ export function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
-// Redirect if not authenticated
-export function requireAuth(auth, db, allowedRoles, redirectTo = '../index.html') {
+// ════════════════════════════════════════════
+// requireAuth — call this at the top of each protected page
+//
+// Usage in your page scripts:
+//
+//   import { ..., onAuthStateChanged, signOut } from "firebase/auth";
+//   import { ..., doc, getDoc } from "firebase/firestore";
+//   import { firebaseConfig, requireAuth } from "../js/config.js";
+//
+//   requireAuth(
+//     auth, db,
+//     onAuthStateChanged, signOut,
+//     doc, getDoc,
+//     ['coordinator'],          // allowed roles
+//     '../index.html'           // redirect target (optional)
+//   ).then(({ user, userData }) => {
+//     // page is authenticated — start your logic here
+//   });
+// ════════════════════════════════════════════
+export function requireAuth(
+  auth,
+  db,
+  onAuthStateChanged,
+  signOut,
+  docFn,
+  getDocFn,
+  allowedRoles = [],
+  redirectTo = '../index.html'
+) {
   return new Promise((resolve) => {
-    const { onAuthStateChanged } = window.__firebase_auth__;
-    const { doc, getDoc } = window.__firebase_db__;
     onAuthStateChanged(auth, async (user) => {
-      if (!user) { window.location.href = redirectTo; return; }
-      const snap = await getDoc(doc(db, 'users', user.uid));
-      if (!snap.exists()) { window.location.href = redirectTo; return; }
-      const data = snap.data();
-      if (allowedRoles && !allowedRoles.includes(data.role)) {
-        window.location.href = redirectTo; return;
+
+      // 1. Not logged in at all
+      if (!user) {
+        window.location.href = redirectTo;
+        return;
       }
-      resolve({ user, userData: data });
+
+      // 2. Firestore document doesn't exist yet (user created in Auth but
+      //    the /users/{uid} doc hasn't been written — causes the bug-log loop)
+      const snap = await getDocFn(docFn(db, 'users', user.uid));
+      if (!snap.exists()) {
+        await signOut(auth);          // sign out the incomplete user
+        window.location.href = redirectTo;
+        return;
+      }
+
+      const userData = snap.data();
+
+      // 3. User exists but doesn't have an allowed role
+      if (allowedRoles.length && !allowedRoles.includes(userData.role)) {
+        window.location.href = redirectTo;
+        return;
+      }
+
+      // 4. All checks passed
+      resolve({ user, userData });
     });
   });
 }

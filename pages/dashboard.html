@@ -41,6 +41,7 @@
         <div class="page-breadcrumb">Ceylon Business Appliances · Trackable Solution Trial</div>
       </div>
       <div class="topbar-right">
+        <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
         <button class="btn btn-primary" onclick="openAddModal()">+ Add Feedback</button>
       </div>
     </div>
@@ -92,6 +93,16 @@
 
       <!-- ══ DEPARTMENTS ══ -->
       <div id="sec-departments" class="section-panel" style="display:none">
+        <div class="card mb-16">
+          <div class="section-hdr">
+            <div><div class="section-title">Manage departments</div><div class="section-sub">Add departments and their sub-services</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0"><input class="form-input" id="new-dept-name" placeholder="Department name"></div>
+            <div class="form-group" style="margin:0"><input class="form-input" id="new-dept-services" placeholder="Sub-services (comma separated)"></div>
+            <button class="btn btn-primary" onclick="addDepartment()">+ Add department</button>
+          </div>
+        </div>
         <div class="dept-grid" id="dept-grid"></div>
       </div>
 
@@ -155,7 +166,16 @@
   <div class="modal">
     <div class="modal-hdr"><h3>Add feedback entry</h3><button class="modal-close" onclick="closeAddModal()">×</button></div>
     <div class="form-group"><label class="form-label">Department</label>
-      <select class="form-select" id="f-dept"><option value="">Select department…</option></select></div>
+     <select class="form-select" id="f-dept" onchange="onDeptChange(this.value)">
+        <option value="">Select department…</option>
+     </select>
+    </div>
+    <div class="form-group" id="subservice-group" style="display:none">
+     <label class="form-label">Sub-service</label>
+     <select class="form-select" id="f-subservice">
+       <option value="">Select sub-service…</option>
+    </select>
+  </div>
     <div class="form-group"><label class="form-label">Worker name</label><input class="form-input" id="f-name" placeholder="e.g. Nimal Perera"></div>
     <div class="form-group"><label class="form-label">Type</label>
       <select class="form-select" id="f-type">
@@ -199,16 +219,70 @@
     </div>
   </div>
 </div>
+<!-- EDIT FEEDBACK MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Edit feedback entry</h3><button class="modal-close" onclick="closeEditModal()">×</button></div>
+    <div class="form-group"><label class="form-label">Worker name</label><input class="form-input" id="edit-name" placeholder="e.g. Nimal Perera"></div>
+    <div class="form-group"><label class="form-label">Type</label>
+      <select class="form-select" id="edit-type">
+        <option value="doubt">Doubt / Question</option>
+        <option value="suggestion">Suggestion</option>
+        <option value="bug">Bug / Error</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Priority</label>
+      <select class="form-select" id="edit-priority">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Description</label>
+      <textarea class="form-textarea" id="edit-desc" rows="4" placeholder="Describe the issue…"></textarea>
+    </div>
+    <div id="edit-modal-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+<!-- THREAD MODAL -->
+<div class="modal-overlay" id="thread-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-hdr"><h3>💬 Discussion thread</h3><button class="modal-close" onclick="closeThreadModal()">×</button></div>
+    <div id="thread-feedback-detail" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px"></div>
+    <div id="thread-messages" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-right:4px"></div>
+    <div class="form-group" style="margin:0">
+      <textarea class="form-textarea" id="thread-input" rows="3" placeholder="Ask a follow-up question or add a comment…"></textarea>
+    </div>
+    <div id="thread-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeThreadModal()">Close</button>
+      <button class="btn btn-primary" onclick="postThreadMessage()">Send message</button>
+    </div>
+  </div>
+</div>
 
 <!-- Firebase + App Script -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc,
-  onSnapshot, updateDoc, serverTimestamp, query, orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, emailjsConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
+
+window.toggleTheme = function() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('ts-theme', isLight ? 'light' : 'dark');
+};
+// Restore saved theme on load
+if (localStorage.getItem('ts-theme') === 'light') {
+  document.body.classList.add('light');
+  document.getElementById('theme-toggle').textContent = '☀️';
+}
 
 // EmailJS
 const EJS = document.createElement('script');
@@ -220,7 +294,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [];
+let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [];
 let statusFilter = 'all', typeFilter = '';
 
 // ── Auth guard ──
@@ -235,6 +309,14 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function initApp() {
+  onSnapshot(collection(db, 'departments'), snap => {
+    allDepts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const deptOpts = allDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+    document.getElementById('f-dept').innerHTML = '<option value="">Select department…</option>' + deptOpts;
+    document.getElementById('dept-filter').innerHTML = '<option value="">All departments</option>' + deptOpts;
+    renderDeptGrid();
+    renderDeptProgress();
+  });
   // Populate dept dropdowns
   DEPARTMENTS.forEach(d => {
     document.getElementById('f-dept').innerHTML += `<option value="${d}">${d}</option>`;
@@ -279,7 +361,7 @@ function renderRecent() {
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.description || ''}</div>
         <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
-          <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface3);color:var(--muted)">${f.dept}</span>
+          <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface3);color:var(--muted)">${f.dept}${f.subService ? ' › ' + f.subService : ''}</span>                
           ${badge(f.type, FEEDBACK_TYPES)} ${badge(f.status, STATUS)}
           <span class="text-sm text-muted">${f.workerName} · ${formatDate(f.createdAt)}</span>
         </div>
@@ -290,6 +372,7 @@ function renderRecent() {
 window.renderFeedback = function() {
   const search = document.getElementById('search-input').value.toLowerCase();
   const dept = document.getElementById('dept-filter').value;
+  const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   let list = allFeedback.filter(f => {
     const matchStatus = statusFilter === 'all' || f.status === statusFilter;
     const matchType = !typeFilter || f.type === typeFilter;
@@ -298,8 +381,16 @@ window.renderFeedback = function() {
       || (f.dept||'').toLowerCase().includes(search)
       || (f.workerName||'').toLowerCase().includes(search);
     return matchStatus && matchType && matchDept && matchSearch;
+  }).sort((a, b) => {
+    // Critical items always first, then by creation date within same priority
+    const pa = priorityOrder[a.priority || 'medium'] ?? 2;
+    const pb = priorityOrder[b.priority || 'medium'] ?? 2;
+    if (pa !== pb) return pa - pb;
+    const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+    return tb - ta;
   });
-
+  
   const el = document.getElementById('feedback-list');
   if (!list.length) { el.innerHTML = '<div class="empty-state"><div class="icon">◎</div><p>No matching entries</p></div>'; return; }
   el.innerHTML = list.map(f => `
@@ -322,10 +413,21 @@ window.renderFeedback = function() {
             <option value="in-progress" ${f.status==='in-progress'?'selected':''}>In progress</option>
             <option value="resolved" ${f.status==='resolved'?'selected':''}>Resolved</option>
           </select>
+          <button class="btn btn-sm" style="color:var(--accent2);padding:4px 10px;border:1px solid rgba(56,139,253,0.3)" onclick="openEditModal('${f.id}')" title="Edit this entry">✎</button>
+          <button class="btn btn-sm" style="color:var(--accent);padding:4px 10px;border:1px solid rgba(46,168,79,0.3)" onclick="openThreadModal('${f.id}')" title="Discussion thread">💬${f.threadCount ? ` <span style='font-size:10px'>${f.threadCount}</span>` : ''}</button>
+          <button class="btn btn-sm" style="color:var(--danger);padding:4px 10px;border:1px solid rgba(248,81,73,0.3)" onclick="deleteFeedback('${f.id}')" title="Delete this entry">✕</button>
         </div>
       </div>
       ${f.itReply
-        ? `<div class="it-reply"><div class="it-reply-label">IT Developer reply</div><div class="it-reply-text">${f.itReply}</div></div>`
+        ? `<div class="it-reply" style="margin-top:10px">
+             <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleReply('reply-${f.id}')">
+               <div class="it-reply-label" style="margin:0">✅ IT Developer replied</div>
+               <span style="font-size:11px;color:var(--accent2)" id="reply-toggle-${f.id}">Show ▾</span>
+             </div>
+             <div id="reply-${f.id}" style="display:none;margin-top:8px">
+               <div class="it-reply-text">${f.itReply}</div>
+             </div>
+           </div>`
         : `<div class="awaiting-reply">⏳ Awaiting IT developer response…</div>`}
     </div>`).join('');
 };
@@ -351,23 +453,29 @@ function renderDeptProgress() {
 
 function renderDeptGrid() {
   const el = document.getElementById('dept-grid');
-  const depts = DEPARTMENTS;
-  el.innerHTML = depts.map(d => {
-    const items = allFeedback.filter(f => f.dept === d);
+  if (!allDepts.length) { el.innerHTML = '<div class="text-sm text-muted">No departments yet</div>'; return; }
+  el.innerHTML = allDepts.map(d => {
+    const items = allFeedback.filter(f => f.dept === d.name);
     const done = items.filter(f => f.status === 'resolved').length;
     const pct = items.length ? Math.round(done / items.length * 100) : 0;
     const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
-    const bugs = items.filter(f => f.type === 'bug').length;
+    const services = (d.services || []).map(s =>
+      `<span style="font-size:11px;padding:1px 8px;border-radius:99px;background:var(--surface3);color:var(--muted);margin:2px">${s}</span>`
+    ).join('');
     return `<div class="dept-card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div style="width:10px;height:10px;border-radius:50%;background:${deptColor(d)}"></div>
-        <div class="dept-name" style="margin:0">${d}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${deptColor(d.name)}"></div>
+          <div class="dept-name" style="margin:0">${d.name}</div>
+        </div>
+        <button class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="removeDepartment('${d.id}','${d.name}')">✕</button>
       </div>
+      ${services ? `<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px">${services}</div>` : ''}
       <div class="dept-stats">
         <div><span>${items.length}</span> total</div>
-        <div style="color:var(--warn)"><span style="color:var(--warn)">${items.filter(f=>f.status==='pending').length}</span> pending</div>
-        <div style="color:var(--danger)"><span style="color:var(--danger)">${bugs}</span> bugs</div>
-        <div style="color:var(--accent)"><span style="color:var(--accent)">${done}</span> resolved</div>
+        <div><span style="color:var(--warn)">${items.filter(f=>f.status==='pending').length}</span> pending</div>
+        <div><span style="color:var(--danger)">${items.filter(f=>f.type==='bug').length}</span> bugs</div>
+        <div><span style="color:var(--accent)">${done}</span> resolved</div>
       </div>
       <div class="progress-bar mb-4"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
       <div class="text-sm text-muted">${pct}% resolved</div>
@@ -400,6 +508,7 @@ function renderTimeline() {
           <option value="wip" ${p.status==='wip'?'selected':''}>In progress</option>
           <option value="done" ${p.status==='done'?'selected':''}>Done</option>
         </select>
+        <button class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="deleteTimeline('${p.id}')">✕</button>
       </div>
     </div>`).join('');
 }
@@ -414,16 +523,14 @@ function renderUsers() {
   const el = document.getElementById('users-list');
   if (!allUsers.length) { el.innerHTML = '<div class="text-sm text-muted">No users yet</div>'; return; }
   el.innerHTML = `<table class="data-table">
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
     <tbody>${allUsers.map(u => `
       <tr>
         <td style="font-weight:500">${u.name || '—'}</td>
         <td style="color:var(--muted)">${u.email || '—'}</td>
-        <td>${badge(u.role, {
-          coordinator: {label:'Coordinator', color:'badge-coordinator'},
-          developer: {label:'IT Developer', color:'badge-developer'},
-          management: {label:'Management', color:'badge-management'}
-        })}</td>
+        <td>${badge(u.role, { coordinator:{label:'Coordinator',color:'badge-coordinator'}, developer:{label:'IT Developer',color:'badge-developer'}, management:{label:'Management',color:'badge-management'} })}</td>
+        <td><button class="btn btn-sm" style="color:var(--danger)" onclick="deleteUser('${u.id}','${u.name}')">Remove</button></td>
+     </tr>
       </tr>`).join('')}
     </tbody>
   </table>`;
@@ -439,12 +546,17 @@ window.updateTimelineStatus = async (id, status) => {
 };
 
 window.openAddModal = () => document.getElementById('add-modal').classList.add('open');
-window.closeAddModal = () => document.getElementById('add-modal').classList.remove('open');
+window.closeAddModal = () => {
+  document.getElementById('add-modal').classList.remove('open');
+  document.getElementById('subservice-group').style.display = 'none';
+  document.getElementById('f-subservice').innerHTML = '<option value="">Select sub-service…</option>';
+};
 window.openTimelineModal = () => document.getElementById('tl-modal').classList.add('open');
 
 window.submitFeedback = async function() {
   const dept = document.getElementById('f-dept').value;
   const name = document.getElementById('f-name').value.trim();
+  const subService = document.getElementById('f-subservice').value || '';
   const type = document.getElementById('f-type').value;
   const priority = document.getElementById('f-priority').value;
   const desc = document.getElementById('f-desc').value.trim();
@@ -456,7 +568,7 @@ window.submitFeedback = async function() {
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
     const ref = await addDoc(collection(db, 'feedback'), {
-      dept, workerName: name, type, priority,
+      dept, subService, workerName: name, type, priority,
       description: desc, status: 'pending', itReply: '',
       createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       addedBy: currentUser.uid
@@ -497,8 +609,23 @@ window.createUser = async function() {
   const pass = document.getElementById('new-pass').value;
   if (!name || !email || !pass) { showAlert('Fill all user fields.', 'danger'); return; }
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, 'users', cred.user.uid), { name, email, role, createdAt: serverTimestamp() });
+    // ✅ Use a SECONDARY app instance so the coordinator's session is NOT replaced
+    const { initializeApp: initSecondary, deleteApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getAuth: getSecondaryAuth, createUserWithEmailAndPassword: createSecondary } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+
+    const secondaryApp = initSecondary(firebaseConfig, 'secondary-' + Date.now());
+    const secondaryAuth = getSecondaryAuth(secondaryApp);
+
+    const cred = await createSecondary(secondaryAuth, email, pass);
+    const uid = cred.user.uid;
+
+    // Sign out from secondary immediately — coordinator session untouched
+    await secondaryAuth.signOut();
+    await deleteApp(secondaryApp);
+
+    // Write Firestore doc using the main db (coordinator is still authenticated)
+    await setDoc(doc(db, 'users', uid), { name, email, role, createdAt: serverTimestamp() });
+
     showAlert(`User ${name} created successfully!`, 'success');
     await loadUsers();
     document.getElementById('new-name').value = '';
@@ -566,6 +693,169 @@ window.setTypeFilter = function(val, el) {
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderFeedback();
+};
+
+window.addDepartment = async function() {
+  const name = document.getElementById('new-dept-name').value.trim();
+  const raw = document.getElementById('new-dept-services').value;
+  if (!name) { showAlert('Enter a department name.', 'danger'); return; }
+  const services = raw.split(',').map(s => s.trim()).filter(Boolean);
+  await addDoc(collection(db, 'departments'), { name, services, createdAt: serverTimestamp() });
+  document.getElementById('new-dept-name').value = '';
+  document.getElementById('new-dept-services').value = '';
+  showAlert(`Department "${name}" added.`, 'success');
+};
+
+window.deleteFeedback = async function(id) {
+  if (!confirm('Delete this feedback entry? This cannot be undone.')) return;
+  try {
+    await deleteDoc(doc(db, 'feedback', id));
+    showAlert('Feedback deleted.', 'success');
+  } catch(e) {
+    showAlert('Failed to delete. Please try again.', 'danger');
+  }
+};
+
+window.deleteTimeline = async function(id) {
+  if (!confirm('Remove this timeline phase?')) return;
+  await deleteDoc(doc(db, 'timeline', id));
+};
+
+window.deleteUser = async function(id, name) {
+  if (!confirm(`Remove user "${name}" from the system?`)) return;
+  await deleteDoc(doc(db, 'users', id));
+  showAlert(`User ${name} removed.`, 'success');
+  await loadUsers();
+};
+
+window.removeDepartment = async function(id, name) {
+  if (!confirm(`Remove department "${name}"?`)) return;
+  await deleteDoc(doc(db, 'departments', id));
+  showAlert(`Department "${name}" removed.`, 'success');
+};
+
+window.onDeptChange = function(deptName) {
+  const dept = allDepts.find(d => d.name === deptName);
+  const group = document.getElementById('subservice-group');
+  const select = document.getElementById('f-subservice');
+  if (dept && dept.services && dept.services.length > 0) {
+    select.innerHTML = '<option value="">Select sub-service…</option>' +
+      dept.services.map(s => `<option value="${s}">${s}</option>`).join('');
+    group.style.display = 'block';
+  } else {
+    group.style.display = 'none';
+    select.innerHTML = '<option value="">Select sub-service…</option>';
+  }
+};
+
+window.toggleReply = function(id) {
+  const el = document.getElementById(id);
+  const toggleId = id.replace('reply-', 'reply-toggle-');
+  const tog = document.getElementById(toggleId);
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  tog.textContent = isHidden ? 'Hide ▴' : 'Show ▾';
+};
+
+let editingId = null;
+
+window.openEditModal = function(id) {
+  editingId = id;
+  const f = allFeedback.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('edit-name').value = f.workerName || '';
+  document.getElementById('edit-type').value = f.type || 'doubt';
+  document.getElementById('edit-priority').value = f.priority || 'medium';
+  document.getElementById('edit-desc').value = f.description || '';
+  document.getElementById('edit-modal-alert').innerHTML = '';
+  document.getElementById('edit-modal').classList.add('open');
+};
+
+window.closeEditModal = function() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editingId = null;
+};
+
+window.submitEdit = async function() {
+  const name = document.getElementById('edit-name').value.trim();
+  const type = document.getElementById('edit-type').value;
+  const priority = document.getElementById('edit-priority').value;
+  const desc = document.getElementById('edit-desc').value.trim();
+  if (!name || !desc) {
+    document.getElementById('edit-modal-alert').innerHTML = '<div class="alert alert-danger">Please fill all fields.</div>';
+    return;
+  }
+  await updateDoc(doc(db, 'feedback', editingId), {
+    workerName: name, type, priority, description: desc, updatedAt: serverTimestamp()
+  });
+  closeEditModal();
+  showAlert('Feedback updated successfully!', 'success');
+};
+
+// ── Thread / Comments ──
+let threadFeedbackId = null;
+let threadUnsub = null;
+
+window.openThreadModal = function(id) {
+  threadFeedbackId = id;
+  const f = allFeedback.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('thread-feedback-detail').innerHTML = `
+    <div style="font-size:13px;font-weight:500;margin-bottom:6px">${f.description}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;background:var(--surface3);color:var(--muted);padding:1px 7px;border-radius:99px">${f.dept}</span>
+      ${badge(f.type, FEEDBACK_TYPES)} — ${f.workerName}
+    </div>`;
+  document.getElementById('thread-input').value = '';
+  document.getElementById('thread-alert').innerHTML = '';
+  document.getElementById('thread-modal').classList.add('open');
+
+  // Unsubscribe previous listener
+  if (threadUnsub) threadUnsub();
+  threadUnsub = onSnapshot(
+    query(collection(db, 'feedback', id, 'thread'), orderBy('createdAt', 'asc')),
+    snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const el = document.getElementById('thread-messages');
+      if (!msgs.length) {
+        el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No messages yet — start the conversation</div>';
+        return;
+      }
+      el.innerHTML = msgs.map(m => {
+        const isCoord = m.role === 'coordinator';
+        return `<div style="display:flex;flex-direction:column;align-items:${isCoord ? 'flex-end' : 'flex-start'}">
+          <div style="max-width:80%;background:${isCoord ? 'rgba(56,139,253,0.12)' : 'rgba(46,168,79,0.1)'};border:1px solid ${isCoord ? 'rgba(56,139,253,0.25)' : 'rgba(46,168,79,0.2)'};border-radius:10px;padding:10px 14px">
+            <div style="font-size:11px;font-weight:600;color:${isCoord ? 'var(--accent2)' : 'var(--accent)'};margin-bottom:4px">${m.senderName} · ${isCoord ? 'Coordinator' : 'IT Developer'}</div>
+            <div style="font-size:13px;line-height:1.5">${m.text}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:right">${formatDate(m.createdAt)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      // Auto-scroll to bottom
+      el.scrollTop = el.scrollHeight;
+    }
+  );
+};
+
+window.closeThreadModal = function() {
+  document.getElementById('thread-modal').classList.remove('open');
+  if (threadUnsub) { threadUnsub(); threadUnsub = null; }
+  threadFeedbackId = null;
+};
+
+window.postThreadMessage = async function() {
+  const text = document.getElementById('thread-input').value.trim();
+  if (!text) { document.getElementById('thread-alert').innerHTML = '<div class="alert alert-danger">Please write a message.</div>'; return; }
+  await addDoc(collection(db, 'feedback', threadFeedbackId, 'thread'), {
+    text, senderName: currentUser.name || 'Coordinator',
+    senderId: currentUser.uid, role: 'coordinator',
+    createdAt: serverTimestamp()
+  });
+  // Update thread count on parent doc
+  const msgs = await getDocs(collection(db, 'feedback', threadFeedbackId, 'thread'));
+  await updateDoc(doc(db, 'feedback', threadFeedbackId), { threadCount: msgs.size });
+  document.getElementById('thread-input').value = '';
+  document.getElementById('thread-alert').innerHTML = '';
 };
 
 function showAlert(msg, type) {

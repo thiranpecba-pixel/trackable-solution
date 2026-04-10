@@ -219,7 +219,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // ════════════════════════════════════════════
@@ -243,7 +243,12 @@
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       const snap = await getDoc(doc(db, 'users', user.uid));
-      const role = snap.exists() ? snap.data().role : 'coordinator';
+      if (!snap.exists()) {
+        // Auth record exists but no Firestore doc — sign out and stop
+        await signOut(auth);
+        return;
+      }
+      const role = snap.data().role;
       redirectByRole(role);
     }
   });
@@ -260,8 +265,34 @@
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const snap = await getDoc(doc(db, 'users', cred.user.uid));
-      const role = snap.exists() ? snap.data().role : 'coordinator';
-      redirectByRole(role);
+
+      // ✅ KEY FIX: If no Firestore doc exists, reject the login
+      if (!snap.exists()) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        document.querySelector('.btn-login').classList.remove('loading');
+        showErr('Account not recognized. Contact your coordinator for access.');
+        return;
+      }
+
+      const role = snap.data().role;
+
+    // ✅ Map tab selection to allowed roles
+    const roleTabMap = {
+      coordinator: ['coordinator'],
+      developer:   ['developer', 'it', 'it_developer'],
+      management:  ['management']
+    };
+
+    if (!roleTabMap[currentRole].includes(role)) {
+      await signOut(auth);
+      spinner.style.display = 'none';
+      document.querySelector('.btn-login').classList.remove('loading');
+      showErr('This account does not have access to the selected role tab.');
+      return;
+    }
+
+    redirectByRole(role);
     } catch(e) {
       spinner.style.display = 'none';
       document.querySelector('.btn-login').classList.remove('loading');

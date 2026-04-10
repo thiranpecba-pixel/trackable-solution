@@ -37,6 +37,14 @@ body {
   line-height: 1.6;
 }
 
+body.light {
+  --bg: #f6f8fa; --surface: #ffffff; --surface2: #f0f2f5;
+  --surface3: #e8eaed; --border: #d0d7de; --border2: #c9cfd6;
+  --text: #1f2328; --muted: #636c76;
+}
+body.light .sidebar { background: #ffffff; border-right: 1px solid var(--border); }
+body.light .topbar { background: #ffffff; border-bottom: 1px solid var(--border); }
+
 /* ── Layout ── */
 .app-shell { display: flex; min-height: 100vh; }
 

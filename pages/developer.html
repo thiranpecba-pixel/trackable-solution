@@ -89,10 +89,28 @@
   </div>
 </div>
 
+<!-- THREAD MODAL (Developer) -->
+<div class="modal-overlay" id="dev-thread-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-hdr"><h3>💬 Discussion thread</h3><button class="modal-close" onclick="closeDevThread()">×</button></div>
+    <div id="dev-thread-detail" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px"></div>
+    <div id="dev-thread-messages" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-right:4px"></div>
+    <div class="form-group" style="margin:0">
+      <textarea class="form-textarea" id="dev-thread-input" rows="3" placeholder="Reply to coordinator or add an update…"></textarea>
+    </div>
+    <div id="dev-thread-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDevThread()">Close</button>
+      <button class="btn btn-primary" onclick="postDevMessage()">Send message</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, updateDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot, updateDoc, serverTimestamp, query, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -159,7 +177,13 @@ function renderFeedback() {
                 <span class="text-sm text-muted">📅 ${formatDate(f.createdAt)}</span>
               </div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openReplyModal('${f.id}')">Reply</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" style="background:rgba(248,81,73,0.12);color:var(--danger);border:1px solid rgba(248,81,73,0.3)" onclick="deleteFeedback('${f.id}')">Delete</button>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-primary btn-sm" onclick="openReplyModal('${f.id}')">Reply</button>
+              <button class="btn btn-sm" style="border:1px solid rgba(46,168,79,0.3);color:var(--accent)" onclick="openDevThread('${f.id}')">💬${f.threadCount ? ` ${f.threadCount}` : ''}</button>
+            </div>
           </div>
           ${f.itReply
             ? `<div class="it-reply"><div class="it-reply-label">Your reply</div><div class="it-reply-text">${f.itReply}</div></div>`
@@ -211,13 +235,81 @@ window.submitReply = async function() {
   showAlert('Reply submitted!', 'success');
 };
 
-window.doSignOut = async () => { await signOut(auth); window.location.href = '../index.html'; };
+window.deleteFeedback = async function(id) {
+  if (!confirm('Delete this feedback entry? This cannot be undone.')) return;
+  try {
+    await deleteDoc(doc(db, 'feedback', id));
+    showAlert('Feedback deleted.', 'success');
+  } catch(e) {
+    showAlert('Failed to delete. Please try again.', 'danger');
+  }
+};
 
 function showAlert(msg, type) {
   const el = document.getElementById('alert-area');
   el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
   setTimeout(() => el.innerHTML = '', 4000);
 }
+
+let devThreadId = null, devThreadUnsub = null;
+
+window.openDevThread = function(id) {
+  devThreadId = id;
+  const f = allFeedback.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('dev-thread-detail').innerHTML = `
+    <div style="font-size:13px;font-weight:500;margin-bottom:6px">${f.description}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;background:var(--surface3);color:var(--muted);padding:1px 7px;border-radius:99px">${f.dept}</span>
+      ${badge(f.type, FEEDBACK_TYPES)} — ${f.workerName}
+    </div>`;
+  document.getElementById('dev-thread-input').value = '';
+  document.getElementById('dev-thread-alert').innerHTML = '';
+  document.getElementById('dev-thread-modal').classList.add('open');
+
+  if (devThreadUnsub) devThreadUnsub();
+  devThreadUnsub = onSnapshot(
+    query(collection(db, 'feedback', id, 'thread'), orderBy('createdAt', 'asc')),
+    snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const el = document.getElementById('dev-thread-messages');
+      if (!msgs.length) {
+        el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = msgs.map(m => {
+        const isCoord = m.role === 'coordinator';
+        return `<div style="display:flex;flex-direction:column;align-items:${isCoord ? 'flex-start' : 'flex-end'}">
+          <div style="max-width:80%;background:${isCoord ? 'rgba(46,168,79,0.1)' : 'rgba(56,139,253,0.12)'};border:1px solid ${isCoord ? 'rgba(46,168,79,0.2)' : 'rgba(56,139,253,0.25)'};border-radius:10px;padding:10px 14px">
+            <div style="font-size:11px;font-weight:600;color:${isCoord ? 'var(--accent)' : 'var(--accent2)'};margin-bottom:4px">${m.senderName} · ${isCoord ? 'Coordinator' : 'IT Developer'}</div>
+            <div style="font-size:13px;line-height:1.5">${m.text}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:right">${formatDate(m.createdAt)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+  );
+};
+
+window.closeDevThread = function() {
+  document.getElementById('dev-thread-modal').classList.remove('open');
+  if (devThreadUnsub) { devThreadUnsub(); devThreadUnsub = null; }
+  devThreadId = null;
+};
+
+window.postDevMessage = async function() {
+  const text = document.getElementById('dev-thread-input').value.trim();
+  if (!text) { document.getElementById('dev-thread-alert').innerHTML = '<div class="alert alert-danger">Please write a message.</div>'; return; }
+  await addDoc(collection(db, 'feedback', devThreadId, 'thread'), {
+    text, senderName: currentUser.name || 'IT Developer',
+    senderId: currentUser.uid, role: 'developer',
+    createdAt: serverTimestamp()
+  });
+  const msgs = await getDocs(collection(db, 'feedback', devThreadId, 'thread'));
+  await updateDoc(doc(db, 'feedback', devThreadId), { threadCount: msgs.size });
+  document.getElementById('dev-thread-input').value = '';
+};
 
 // expose search input reference
 window.document.addEventListener('DOMContentLoaded', () => {
