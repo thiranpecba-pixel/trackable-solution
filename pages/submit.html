@@ -112,7 +112,25 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig, emailjsConfig, IT_DEVELOPER_EMAILS, FEEDBACK_TYPES } from "../js/config.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+  authDomain: "trackable-progress.firebaseapp.com",
+  projectId: "trackable-progress",
+  storageBucket: "trackable-progress.firebasestorage.app",
+  messagingSenderId: "961877401670",
+  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+};
+
+const emailjsConfig = {
+  publicKey: "M0fN-ZhFBMo2K-psq",
+  serviceId: "service_z6bjou4",
+  templateId: "template_s023zsn"
+};
+
+const IT_DEVELOPER_EMAILS = [
+  "thiranperera29@gmail.com",
+  "developer2@ceylonba.com"
+];
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
