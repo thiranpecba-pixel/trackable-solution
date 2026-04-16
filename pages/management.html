@@ -122,17 +122,41 @@
 
       <!-- TIMELINE -->
       <div id="sec-timeline" class="section-panel" style="display:none">
+
+        <!-- Scope tabs: Overall + one tab per department -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+          <button class="filter-chip active" id="tl-tab-overall" onclick="switchTimelineScope('overall',this)">⊞ Overall</button>
+          <div id="tl-dept-tabs" style="display:contents"></div>
+        </div>
+
         <div class="grid-2">
+          <!-- Left: timeline phases list -->
           <div class="card">
-            <div class="section-title mb-16">Project phases</div>
-            <div class="timeline" id="timeline-list"></div>
+            <div class="section-hdr" style="margin-bottom:16px">
+              <div>
+                <div class="section-title" id="tl-scope-title">Overall — Trial &amp; launch phases</div>
+                <div class="section-sub" id="tl-scope-sub">All departments · Project milestone tracker</div>
+              </div>
+            </div>
+            <div class="timeline" id="timeline-list"><div class="text-sm text-muted">No phases added yet</div></div>
           </div>
-          <div class="card">
-            <div class="section-title mb-8">Overall trial progress</div>
-            <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="overall-pct">0%</div>
-            <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="overall-bar" style="width:0%;background:var(--accent)"></div></div>
-            <div class="text-sm text-muted mb-24" id="overall-sub"></div>
-            <div style="border-top:1px solid var(--border);padding-top:16px">
+
+          <!-- Right: completion stats -->
+          <div>
+            <div class="card mb-16">
+              <div class="section-title mb-8" id="tl-pct-label">Overall completion</div>
+              <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="overall-pct">0%</div>
+              <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="overall-bar" style="width:0%;background:var(--accent)"></div></div>
+              <div class="text-sm text-muted mb-0" id="overall-sub"></div>
+            </div>
+
+            <!-- Department-wise mini breakdown (only visible on Overall tab) -->
+            <div class="card mb-16" id="tl-dept-breakdown">
+              <div class="section-title mb-12">By department</div>
+              <div id="tl-dept-breakdown-list"><div class="text-sm text-muted">No department phases yet</div></div>
+            </div>
+
+            <div class="card">
               <div class="section-title mb-8">Feedback resolution</div>
               <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="fb-pct">0%</div>
               <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="fb-bar" style="width:0%;background:var(--purple)"></div></div>
@@ -317,26 +341,98 @@ function renderDeptGrid() {
   }).join('');
 }
 
+// ── Timeline scope state ──
+let currentTimelineScope = 'overall'; // 'overall' | dept name
+
+function renderTimelineDeptTabs() {
+  const deptNames = [...new Set(allTimeline.filter(p => p.scope && p.scope !== 'overall').map(p => p.scope))].sort();
+  const tabsEl = document.getElementById('tl-dept-tabs');
+  if (!tabsEl) return;
+  tabsEl.innerHTML = deptNames.map(d =>
+    `<button class="filter-chip ${currentTimelineScope === d ? 'active' : ''}" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',this)">${d}</button>`
+  ).join('');
+  const overall = document.getElementById('tl-tab-overall');
+  if (overall) overall.classList.toggle('active', currentTimelineScope === 'overall');
+}
+
+window.switchTimelineScope = function(scope, el) {
+  currentTimelineScope = scope;
+  document.querySelectorAll('#tl-dept-tabs .filter-chip, #tl-tab-overall').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderTimeline();
+};
+
 function renderTimeline() {
+  renderTimelineDeptTabs();
+
+  const isOverall = currentTimelineScope === 'overall';
+  const phasesForScope = isOverall
+    ? allTimeline.filter(p => !p.scope || p.scope === 'overall')
+    : allTimeline.filter(p => p.scope === currentTimelineScope);
+
+  // Update headings
+  document.getElementById('tl-scope-title').textContent = isOverall
+    ? 'Overall — Trial & launch phases'
+    : `${currentTimelineScope} — Timeline phases`;
+  document.getElementById('tl-scope-sub').textContent = isOverall
+    ? 'All departments · Project milestone tracker'
+    : 'Department-specific milestone tracker';
+  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall completion' : `${currentTimelineScope} completion`;
+
+  // Show/hide dept breakdown panel
+  document.getElementById('tl-dept-breakdown').style.display = isOverall ? '' : 'none';
+
   const el = document.getElementById('timeline-list');
-  if (!allTimeline.length) { el.innerHTML = '<div class="text-sm text-muted">No phases added yet</div>'; return; }
-  const done = allTimeline.filter(p => p.status === 'done').length;
-  const pct = Math.round(done / allTimeline.length * 100);
-  document.getElementById('overall-pct').textContent = pct + '%';
-  document.getElementById('overall-bar').style.width = pct + '%';
-  document.getElementById('overall-sub').textContent = `${done} of ${allTimeline.length} phases complete`;
-  el.innerHTML = allTimeline.map(p => `
-    <div class="tl-item">
-      <div class="tl-dot ${p.status}"></div>
-      <div class="tl-body">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="tl-title">${p.name}</span>
-          ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+  if (!phasesForScope.length) {
+    el.innerHTML = '<div class="text-sm text-muted">No phases added yet for this scope</div>';
+    document.getElementById('overall-pct').textContent = '0%';
+    document.getElementById('overall-bar').style.width = '0%';
+    document.getElementById('overall-sub').textContent = '—';
+  } else {
+    const done = phasesForScope.filter(p => p.status === 'done').length;
+    const pct = Math.round(done / phasesForScope.length * 100);
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    document.getElementById('overall-pct').textContent = pct + '%';
+    document.getElementById('overall-bar').style.width = pct + '%';
+    document.getElementById('overall-bar').style.background = color;
+    document.getElementById('overall-sub').textContent = `${done} of ${phasesForScope.length} phases complete`;
+    el.innerHTML = phasesForScope.map(p => `
+      <div class="tl-item">
+        <div class="tl-dot ${p.status}"></div>
+        <div class="tl-body">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="tl-title">${p.name}</span>
+            ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+          </div>
+          <div class="tl-date">${p.date}</div>
+          <div class="tl-desc">${p.description}</div>
         </div>
-        <div class="tl-date">${p.date}</div>
-        <div class="tl-desc">${p.description}</div>
-      </div>
-    </div>`).join('');
+      </div>`).join('');
+  }
+
+  // Dept breakdown (only on Overall tab) — read-only, clickable to switch tab
+  if (isOverall) {
+    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall');
+    const depts = [...new Set(deptPhases.map(p => p.scope))].sort();
+    const breakdownEl = document.getElementById('tl-dept-breakdown-list');
+    if (!depts.length) {
+      breakdownEl.innerHTML = '<div class="text-sm text-muted">No department-specific phases yet</div>';
+    } else {
+      breakdownEl.innerHTML = depts.map(d => {
+        const items = deptPhases.filter(p => p.scope === d);
+        const dDone = items.filter(p => p.status === 'done').length;
+        const dPct = items.length ? Math.round(dDone / items.length * 100) : 0;
+        const dColor = dPct === 100 ? 'var(--accent)' : dPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+        return `<div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+            <span style="font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',null)">${d}</span>
+            <span style="font-size:12px;color:var(--muted)">${dDone}/${items.length} done</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${dPct}%;background:${dColor}"></div></div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 function renderEngagement() {
