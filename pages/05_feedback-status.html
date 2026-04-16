@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Test Confirmation — Trackable Solution</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--surface3:#21262d;
+    --border:#30363d;--accent:#2ea84f;--accent2:#388bfd;--text:#e6edf3;
+    --muted:#7d8590;--danger:#f85149;--warn:#d29922;--purple:#bc8cff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px;position:relative;overflow-y:auto}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 50%,rgba(46,168,79,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 30%,rgba(56,139,253,0.05) 0%,transparent 60%);pointer-events:none}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(48,54,61,0.3) 1px,transparent 1px),linear-gradient(90deg,rgba(48,54,61,0.3) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;opacity:0.4}
+  .wrap{width:100%;max-width:540px;position:relative;z-index:1}
+  .logo-area{text-align:center;margin-bottom:28px}
+  .logo-badge{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 18px;margin-bottom:16px}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#238636);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-family:'DM Mono',monospace;font-weight:500;color:#fff}
+  .logo-text{font-size:14px;font-weight:500}
+  h1{font-size:22px;font-weight:600;letter-spacing:-0.5px;margin-bottom:6px}
+  .subtitle{font-size:14px;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px}
+  .tag-bug{background:rgba(248,81,73,0.12);color:var(--danger);border:1px solid rgba(248,81,73,0.25)}
+  .tag-suggestion{background:rgba(188,140,255,0.12);color:var(--purple);border:1px solid rgba(188,140,255,0.25)}
+  .tag-doubt{background:rgba(125,133,144,0.12);color:var(--muted);border:1px solid rgba(125,133,144,0.25)}
+  .tag-resolved{background:rgba(46,168,79,0.12);color:var(--accent);border:1px solid rgba(46,168,79,0.25)}
+  .tag-pending{background:rgba(210,153,34,0.12);color:var(--warn);border:1px solid rgba(210,153,34,0.25)}
+  .tag-progress{background:rgba(56,139,253,0.12);color:var(--accent2);border:1px solid rgba(56,139,253,0.25)}
+  .it-reply-box{background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.2);border-radius:10px;padding:14px;margin-top:14px}
+  .it-reply-label{font-size:11px;font-weight:600;color:var(--accent2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+  .it-reply-text{font-size:13px;line-height:1.6;color:var(--text)}
+  .section-label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px}
+  .checklist{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;user-select:none}
+  .check-item:hover{border-color:var(--accent2);background:var(--surface3)}
+  .check-item.checked{border-color:var(--accent);background:rgba(46,168,79,0.06)}
+  .check-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;margin-top:1px;cursor:pointer}
+  .check-item span{font-size:13px;line-height:1.5}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+  .btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity 0.15s}
+  .btn:hover{opacity:0.88}
+  .btn:disabled{opacity:0.45;cursor:not-allowed}
+  .btn-confirm{background:var(--accent);color:#fff}
+  .btn-reject{background:rgba(248,81,73,0.12);color:var(--danger);border:1px solid rgba(248,81,73,0.3)}
+  .form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;resize:vertical;min-height:80px;transition:border-color 0.15s;margin-top:8px}
+  .form-textarea:focus{border-color:var(--accent2)}
+  .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px}
+  .alert-danger{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger)}
+  .alert-success{background:rgba(46,168,79,0.1);border:1px solid rgba(46,168,79,0.3);color:var(--accent)}
+  .alert-warn{background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);color:var(--warn)}
+  .result-screen{text-align:center;padding:24px 0;display:none}
+  .result-icon{font-size:52px;margin-bottom:16px}
+  .result-title{font-size:20px;font-weight:600;margin-bottom:8px}
+  .result-sub{font-size:14px;color:var(--muted);line-height:1.6}
+  .loading-screen{text-align:center;padding:40px 0}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .meta-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .field-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px}
+  .field-val{font-size:14px;font-weight:500}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  .info-cell{background:var(--surface2);border-radius:8px;padding:10px 12px}
+  .already-done{background:rgba(46,168,79,0.06);border:1px solid rgba(46,168,79,0.2);border-radius:10px;padding:16px;text-align:center;margin-top:4px}
+  .already-done-icon{font-size:32px;margin-bottom:8px}
+  .already-done-title{font-size:15px;font-weight:600;color:var(--accent);margin-bottom:4px}
+  .already-done-sub{font-size:13px;color:var(--muted)}
+  .footer-note{text-align:center;font-size:12px;color:var(--muted);margin-top:16px}
+  .reject-section{display:none;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="wrap">
+  <div class="logo-area">
+    <div class="logo-badge">
+      <div class="logo-icon">TS</div>
+      <span class="logo-text">Trackable Solution</span>
+    </div>
+    <h1>Testing Confirmation</h1>
+    <p class="subtitle">Ceylon Business Appliances · Worker Follow-up</p>
+  </div>
+
+  <!-- Loading -->
+  <div class="card" id="loading-screen">
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <div style="font-size:14px;color:var(--muted)">Loading feedback details…</div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="card" id="error-screen" style="display:none">
+    <div style="text-align:center;padding:20px 0">
+      <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">Link not found</div>
+      <div style="font-size:13px;color:var(--muted)">This confirmation link may be invalid or expired. Contact your coordinator.</div>
+    </div>
+  </div>
+
+  <!-- Main form -->
+  <div id="main-screen" style="display:none">
+    <!-- Feedback detail card -->
+    <div class="card">
+      <div class="section-label">Your feedback</div>
+      <div style="font-size:15px;font-weight:500;line-height:1.5;margin-bottom:10px" id="f-description"></div>
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="field-label">Department</div>
+          <div class="field-val" id="f-dept"></div>
+        </div>
+        <div class="info-cell">
+          <div class="field-label">Submitted by</div>
+          <div class="field-val" id="f-worker"></div>
+        </div>
+      </div>
+      <div class="meta-row">
+        <span id="f-type-badge"></span>
+        <span id="f-status-badge"></span>
+        <span id="f-priority-badge" style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--surface3);color:var(--muted)"></span>
+        <span style="font-size:12px;color:var(--muted)" id="f-date"></span>
+      </div>
+
+      <!-- IT Reply -->
+      <div class="it-reply-box" id="it-reply-box" style="display:none">
+        <div class="it-reply-label">💬 IT Developer's solution</div>
+        <div class="it-reply-text" id="it-reply-text"></div>
+      </div>
+
+      <!-- Already confirmed -->
+      <div class="already-done" id="already-done" style="display:none">
+        <div class="already-done-icon" id="already-done-icon"></div>
+        <div class="already-done-title" id="already-done-title"></div>
+        <div class="already-done-sub" id="already-done-sub"></div>
+      </div>
+    </div>
+
+    <!-- Confirmation form -->
+    <div class="card" id="confirm-form">
+      <div class="section-label" style="margin-bottom:14px">Please confirm after testing</div>
+
+      <div class="checklist" id="checklist">
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" onclick="event.stopPropagation()">
+          <span>I have read the IT developer's solution / reply above</span>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" onclick="event.stopPropagation()">
+          <span>I have tested the fix / change in the system myself</span>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" onclick="event.stopPropagation()">
+          <span>The issue / question I raised has been addressed</span>
+        </label>
+      </div>
+
+      <div id="w-alert"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-confirm" id="btn-confirm" onclick="submitConfirm('confirmed')">✓ Yes, it's working</button>
+        <button class="btn btn-reject"  id="btn-reject"  onclick="toggleRejectSection()">✕ Still not working</button>
+      </div>
+
+      <!-- Reject extra section -->
+      <div class="reject-section" id="reject-section">
+        <div class="section-label" style="margin-top:4px">Describe what's still not working</div>
+        <textarea class="form-textarea" id="reject-note" placeholder="e.g. The issue still appears when I try to log in with my department account…"></textarea>
+        <button class="btn btn-reject" style="margin-top:10px;width:100%" onclick="submitConfirm('rejected')">Send rejection to IT team</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result screen (shown after submit) -->
+  <div class="card result-screen" id="result-screen">
+    <div class="result-icon" id="result-icon"></div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-sub"  id="result-sub"></div>
+  </div>
+
+  <p class="footer-note">Your response is logged and reviewed by your IT coordinator.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ── Inline config (no import needed) ──
+const firebaseConfig = {
+  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+  authDomain: "trackable-progress.firebaseapp.com",
+  projectId: "trackable-progress",
+  storageBucket: "trackable-progress.firebasestorage.app",
+  messagingSenderId: "961877401670",
+  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ── Get feedback ID from URL ──
+const params = new URLSearchParams(window.location.search);
+const feedbackId = params.get('id');
+
+let feedbackData = null;
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function typeBadge(type) {
+  const map = { bug:['Bug','tag-bug'], suggestion:['Suggestion','tag-suggestion'], doubt:['Doubt','tag-doubt'] };
+  const [label, cls] = map[type] || ['Unknown','tag-doubt'];
+  return `<span class="tag ${cls}">${label}</span>`;
+}
+
+function statusBadge(status) {
+  const map = { pending:['Pending','tag-pending'], 'in-progress':['In progress','tag-progress'], resolved:['Resolved','tag-resolved'] };
+  const [label, cls] = map[status] || ['Unknown','tag-pending'];
+  return `<span class="tag ${cls}">${label}</span>`;
+}
+
+// ── Load feedback ──
+async function loadFeedback() {
+  if (!feedbackId) { showError(); return; }
+  try {
+    const snap = await getDoc(doc(db, 'feedback', feedbackId));
+    if (!snap.exists()) { showError(); return; }
+    feedbackData = { id: snap.id, ...snap.data() };
+    renderFeedback();
+  } catch(e) {
+    showError();
+  }
+}
+
+function showError() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display  = 'block';
+}
+
+function renderFeedback() {
+  const f = feedbackData;
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display    = 'block';
+
+  document.getElementById('f-description').textContent = f.description || '—';
+  document.getElementById('f-dept').textContent        = f.dept || '—';
+  document.getElementById('f-worker').textContent      = f.workerName || '—';
+  document.getElementById('f-date').textContent        = '📅 ' + formatDate(f.createdAt);
+  document.getElementById('f-type-badge').outerHTML    = typeBadge(f.type);
+  document.getElementById('f-status-badge').outerHTML  = statusBadge(f.status);
+  document.getElementById('f-priority-badge').textContent = (f.priority || 'medium').toUpperCase();
+
+  if (f.itReply) {
+    document.getElementById('it-reply-box').style.display  = 'block';
+    document.getElementById('it-reply-text').textContent   = f.itReply;
+  }
+
+  // Already confirmed/rejected?
+  if (f.workerTestStatus === 'confirmed') {
+    document.getElementById('already-done').style.display  = 'block';
+    document.getElementById('already-done-icon').textContent  = '✅';
+    document.getElementById('already-done-title').textContent = 'You already confirmed this is working';
+    document.getElementById('already-done-sub').textContent   = 'Confirmed on ' + formatDate(f.workerTestedAt) + '. Thank you!';
+    document.getElementById('confirm-form').style.display  = 'none';
+  } else if (f.workerTestStatus === 'rejected') {
+    document.getElementById('already-done').style.display  = 'block';
+    document.getElementById('already-done-icon').textContent  = '🔄';
+    document.getElementById('already-done-title').textContent = 'You reported this as still broken';
+    document.getElementById('already-done-sub').textContent   = 'Sent on ' + formatDate(f.workerTestedAt) + '. The IT team has been notified.';
+    document.getElementById('already-done').style.background  = 'rgba(248,81,73,0.06)';
+    document.getElementById('already-done').style.borderColor = 'rgba(248,81,73,0.2)';
+    document.getElementById('already-done-title').style.color = 'var(--danger)';
+    document.getElementById('confirm-form').style.display  = 'none';
+  } else if (!f.itReply) {
+    // No IT reply yet — show warning, disable form
+    document.getElementById('w-alert').innerHTML = '<div class="alert alert-warn">⏳ The IT team hasn\'t replied yet. You\'ll be able to confirm once they post a solution.</div>';
+    document.getElementById('btn-confirm').disabled = true;
+    document.getElementById('btn-reject').disabled  = true;
+  }
+}
+
+// ── Checklist toggle ──
+window.toggleCheck = function(label) {
+  const cb = label.querySelector('input[type=checkbox]');
+  cb.checked = !cb.checked;
+  label.classList.toggle('checked', cb.checked);
+};
+
+// ── Reject section toggle ──
+window.toggleRejectSection = function() {
+  const sec = document.getElementById('reject-section');
+  sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+};
+
+// ── Submit ──
+window.submitConfirm = async function(decision) {
+  const checks = document.querySelectorAll('#checklist input[type=checkbox]');
+  const allChecked = [...checks].every(c => c.checked);
+
+  if (decision === 'confirmed' && !allChecked) {
+    document.getElementById('w-alert').innerHTML =
+      '<div class="alert alert-danger">Please tick all checkboxes to confirm you have tested the fix.</div>';
+    return;
+  }
+
+  if (decision === 'rejected') {
+    const note = document.getElementById('reject-note').value.trim();
+    if (!note) {
+      document.getElementById('w-alert').innerHTML =
+        '<div class="alert alert-danger">Please describe what is still not working before sending.</div>';
+      return;
+    }
+  }
+
+  document.getElementById('btn-confirm').disabled = true;
+  document.getElementById('btn-reject').disabled  = true;
+  document.getElementById('w-alert').innerHTML    = '';
+
+  const rejectNote = decision === 'rejected' ? document.getElementById('reject-note').value.trim() : '';
+
+  try {
+    const newStatus = decision === 'confirmed' ? 'resolved' : 'in-progress';
+
+    await updateDoc(doc(db, 'feedback', feedbackId), {
+      workerTestStatus: decision,           // 'confirmed' | 'rejected'
+      workerTestedAt:   serverTimestamp(),
+      workerRejectNote: rejectNote,
+      status:           newStatus,
+      // If rejected — clear the IT reply so IT gets fresh context
+      ...(decision === 'rejected' ? { itReply: '', repliedBy: null } : {})
+    });
+
+    // Add a thread message so coordinator + IT can see it
+    await addDoc(collection(db, 'feedback', feedbackId, 'thread'), {
+      text: decision === 'confirmed'
+        ? `✅ Worker confirmed: "${feedbackData.workerName}" tested the fix and confirmed it is working.`
+        : `❌ Worker rejected: "${feedbackData.workerName}" says the issue is still not resolved.\n\nDetails: ${rejectNote}`,
+      senderName: feedbackData.workerName || 'Worker',
+      senderId:   'worker',
+      role:       'worker',
+      createdAt:  serverTimestamp()
+    });
+
+    // Show result
+    document.getElementById('main-screen').style.display  = 'none';
+    document.getElementById('result-screen').style.display = 'block';
+
+    if (decision === 'confirmed') {
+      document.getElementById('result-icon').textContent  = '✅';
+      document.getElementById('result-title').textContent = 'Thank you! Confirmed.';
+      document.getElementById('result-sub').textContent   =
+        'Your confirmation has been logged. The IT coordinator has been notified that this issue is fully resolved.';
+    } else {
+      document.getElementById('result-icon').textContent  = '🔄';
+      document.getElementById('result-title').textContent = 'Feedback sent to IT team.';
+      document.getElementById('result-sub').textContent   =
+        'Your rejection note has been recorded and the item has been re-opened for the IT team. The coordinator will follow up.';
+    }
+  } catch(e) {
+    document.getElementById('w-alert').innerHTML =
+      `<div class="alert alert-danger">Something went wrong: ${e.message}</div>`;
+    document.getElementById('btn-confirm').disabled = false;
+    document.getElementById('btn-reject').disabled  = false;
+  }
+};
+
+loadFeedback();
+</script>
+</body>
+</html>

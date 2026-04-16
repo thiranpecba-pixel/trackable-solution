@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Daily Check-in — Trackable Solution</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;
+    --accent:#2ea84f;--accent2:#388bfd;--text:#e6edf3;--muted:#7d8590;
+    --danger:#f85149;--warn:#d29922;--purple:#bc8cff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px;position:relative;overflow-y:auto}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 50%,rgba(46,168,79,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 30%,rgba(56,139,253,0.05) 0%,transparent 60%);pointer-events:none}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(48,54,61,0.3) 1px,transparent 1px),linear-gradient(90deg,rgba(48,54,61,0.3) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;opacity:0.4}
+  .wrap{width:100%;max-width:480px;position:relative;z-index:1}
+  .logo-area{text-align:center;margin-bottom:28px}
+  .logo-badge{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 18px;margin-bottom:16px}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#238636);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-family:'DM Mono',monospace;font-weight:500;color:#fff}
+  .logo-text{font-size:14px;font-weight:500}
+  h1{font-size:22px;font-weight:600;letter-spacing:-0.5px;margin-bottom:6px}
+  .subtitle{font-size:14px;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:14px}
+  .form-group{margin-bottom:14px}
+  .form-label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px}
+  .form-input,.form-select,.form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.15s}
+  .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent2)}
+  .form-select{appearance:none;cursor:pointer}
+  .form-textarea{resize:vertical;min-height:80px}
+  .usage-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .usage-btn{padding:14px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all 0.15s;text-align:center;font-family:'DM Sans',sans-serif;color:var(--text)}
+  .usage-btn:hover{border-color:var(--accent2);background:rgba(56,139,253,0.06)}
+  .usage-btn.selected{border-color:var(--accent);background:rgba(46,168,79,0.08)}
+  .usage-btn .usage-icon{font-size:22px;margin-bottom:6px}
+  .usage-btn .usage-label{font-size:12px;font-weight:500}
+  .usage-btn .usage-sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .btn-submit{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+  .btn-submit:hover{opacity:0.88}
+  .btn-submit:disabled{opacity:0.45;cursor:not-allowed}
+  .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-top:10px}
+  .alert-danger{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger)}
+  .alert-warn{background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);color:var(--warn)}
+  .result-screen{text-align:center;padding:28px 0;display:none}
+  .result-icon{font-size:56px;margin-bottom:16px}
+  .result-title{font-size:20px;font-weight:600;margin-bottom:8px}
+  .result-sub{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px}
+  .btn-another{padding:10px 24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity 0.15s}
+  .btn-another:hover{opacity:0.8}
+  .streak-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(188,140,255,0.1);border:1px solid rgba(188,140,255,0.25);border-radius:99px;padding:4px 12px;font-size:12px;font-weight:500;color:var(--purple);margin-bottom:14px}
+  .today-banner{background:rgba(46,168,79,0.08);border:1px solid rgba(46,168,79,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:none}
+  .today-banner-text{font-size:13px;color:var(--accent);font-weight:500}
+  .today-banner-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .footer-note{text-align:center;font-size:12px;color:var(--muted);margin-top:12px}
+  .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-mini{text-align:center;padding:24px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="wrap">
+  <div class="logo-area">
+    <div class="logo-badge">
+      <div class="logo-icon">TS</div>
+      <span class="logo-text">Trackable Solution</span>
+    </div>
+    <h1>Daily Check-in</h1>
+    <p class="subtitle">Ceylon Business Appliances · Usage Tracker</p>
+  </div>
+
+  <!-- Form card -->
+  <div class="card" id="form-card">
+    <div id="loading-mini" class="loading-mini">
+      <div class="spinner"></div>
+      Loading…
+    </div>
+    <div id="form-body" style="display:none">
+
+      <!-- Already checked in today banner -->
+      <div class="today-banner" id="today-banner">
+        <div class="today-banner-text">✓ Your department already checked in today</div>
+        <div class="today-banner-sub" id="today-banner-sub">You can still submit another update if needed.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Your name</label>
+        <input class="form-input" id="ci-name" placeholder="e.g. Nimal Perera">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Department</label>
+        <select class="form-select" id="ci-dept">
+          <option value="">Select your department…</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">How did you use the system today?</label>
+        <div class="usage-grid" id="usage-grid">
+          <button type="button" class="usage-btn" data-val="submitted_feedback" onclick="selectUsage(this)">
+            <div class="usage-icon">📝</div>
+            <div class="usage-label">Submitted feedback</div>
+            <div class="usage-sub">Reported a bug, doubt or suggestion</div>
+          </button>
+          <button type="button" class="usage-btn" data-val="checked_replies" onclick="selectUsage(this)">
+            <div class="usage-icon">💬</div>
+            <div class="usage-label">Checked IT replies</div>
+            <div class="usage-sub">Read the IT team's responses</div>
+          </button>
+          <button type="button" class="usage-btn" data-val="tested_fix" onclick="selectUsage(this)">
+            <div class="usage-icon">🔍</div>
+            <div class="usage-label">Tested a fix</div>
+            <div class="usage-sub">Confirmed something was resolved</div>
+          </button>
+          <button type="button" class="usage-btn" data-val="general_use" onclick="selectUsage(this)">
+            <div class="usage-icon">💻</div>
+            <div class="usage-label">General use</div>
+            <div class="usage-sub">Used the system as part of daily work</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Any notes or observations? <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <textarea class="form-textarea" id="ci-note" placeholder="e.g. The new login process is working well for our team…"></textarea>
+      </div>
+
+      <div id="ci-alert"></div>
+      <button class="btn-submit" id="ci-submit" onclick="submitCheckin()">Submit check-in</button>
+    </div>
+  </div>
+
+  <!-- Success screen -->
+  <div class="card result-screen" id="result-screen">
+    <div class="result-icon">✅</div>
+    <div class="result-title">Check-in recorded!</div>
+    <div class="result-sub" id="result-sub">Your daily usage has been logged. The coordinator can see your department is actively using the system.</div>
+    <button class="btn-another" onclick="resetForm()">Submit another</button>
+  </div>
+
+  <p class="footer-note">Check-ins help your coordinator track system adoption across all departments.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+  authDomain: "trackable-progress.firebaseapp.com",
+  projectId: "trackable-progress",
+  storageBucket: "trackable-progress.firebasestorage.app",
+  messagingSenderId: "961877401670",
+  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// Pre-fill dept from URL param
+const params  = new URLSearchParams(window.location.search);
+const deptHint = params.get('dept') || '';
+
+let allDepts    = [];
+let selectedUsage = '';
+
+// Load departments
+const deptSelect = document.getElementById('ci-dept');
+onSnapshot(collection(db, 'departments'), snap => {
+  allDepts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  deptSelect.innerHTML = '<option value="">Select your department…</option>' +
+    allDepts.map(d => `<option value="${d.name}" ${d.name === deptHint ? 'selected' : ''}>${d.name}</option>`).join('');
+
+  if (deptHint) checkTodayActivity(deptHint);
+  document.getElementById('loading-mini').style.display = 'none';
+  document.getElementById('form-body').style.display    = 'block';
+});
+
+// When dept changes, check today's activity
+deptSelect.addEventListener('change', function() {
+  if (this.value) checkTodayActivity(this.value);
+  else document.getElementById('today-banner').style.display = 'none';
+});
+
+async function checkTodayActivity(deptName) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  // Check recent check-ins for this dept today (client-side from a small snapshot)
+  const snap = await new Promise(resolve => {
+    const unsub = onSnapshot(
+      query(collection(db, 'checkins'), where('dept','==',deptName), orderBy('createdAt','desc')),
+      s => { unsub(); resolve(s); }
+    );
+  });
+  const todayCheckins = snap.docs.filter(d => {
+    const ts = d.data().createdAt;
+    if (!ts) return false;
+    const dt = ts.toDate ? ts.toDate() : new Date(ts);
+    return dt >= today;
+  });
+  const banner = document.getElementById('today-banner');
+  if (todayCheckins.length) {
+    banner.style.display = 'block';
+    const last = todayCheckins[0].data();
+    document.getElementById('today-banner-sub').textContent =
+      `Last check-in by ${last.submittedBy || 'a team member'} today. You can still submit another.`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+window.selectUsage = function(btn) {
+  document.querySelectorAll('.usage-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedUsage = btn.dataset.val;
+};
+
+window.submitCheckin = async function() {
+  const name   = document.getElementById('ci-name').value.trim();
+  const dept   = document.getElementById('ci-dept').value;
+  const note   = document.getElementById('ci-note').value.trim();
+  const alertEl = document.getElementById('ci-alert');
+  const btn    = document.getElementById('ci-submit');
+
+  if (!name) { alertEl.innerHTML = '<div class="alert alert-danger">Please enter your name.</div>'; return; }
+  if (!dept) { alertEl.innerHTML = '<div class="alert alert-danger">Please select your department.</div>'; return; }
+  if (!selectedUsage) { alertEl.innerHTML = '<div class="alert alert-danger">Please select how you used the system today.</div>'; return; }
+
+  alertEl.innerHTML = '';
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    await addDoc(collection(db, 'checkins'), {
+      submittedBy: name,
+      dept,
+      usageType:   selectedUsage,
+      note:        note || '',
+      createdAt:   serverTimestamp()
+    });
+
+    const usageLabels = {
+      submitted_feedback: 'submitted feedback',
+      checked_replies:    'checked IT replies',
+      tested_fix:         'tested a fix',
+      general_use:        'general use'
+    };
+
+    document.getElementById('result-sub').textContent =
+      `${name} from ${dept} — "${usageLabels[selectedUsage]}" — has been logged for today. Your coordinator can now see your department is active.`;
+
+    document.getElementById('form-card').style.display   = 'none';
+    document.getElementById('result-screen').style.display = 'block';
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Submit check-in';
+  }
+};
+
+window.resetForm = function() {
+  document.getElementById('ci-name').value  = '';
+  document.getElementById('ci-dept').value  = '';
+  document.getElementById('ci-note').value  = '';
+  selectedUsage = '';
+  document.querySelectorAll('.usage-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('ci-alert').innerHTML = '';
+  document.getElementById('today-banner').style.display = 'none';
+  document.getElementById('form-card').style.display    = 'block';
+  document.getElementById('result-screen').style.display = 'none';
+};
+</script>
+</body>
+</html>
