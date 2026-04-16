@@ -1,145 +1,363 @@
-// ══════════════════════════════════════════
-// Trackable Solution — Firebase Config & Utils
-// Ceylon Business Appliances
-// ══════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trackable Solution — Ceylon Business Appliances</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --accent: #2ea84f;
+    --accent2: #388bfd;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --danger: #f85149;
+    --warn: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 50%, rgba(46,168,79,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 30%, rgba(56,139,253,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(48,54,61,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(48,54,61,0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+  .login-wrap {
+    width: 100%;
+    max-width: 420px;
+    padding: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .logo-area {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 18px;
+    margin-bottom: 20px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), #238636);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    color: #fff;
+  }
+  .logo-text { font-size: 14px; font-weight: 500; letter-spacing: -0.2px; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: var(--muted); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .role-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+  .role-tab {
+    padding: 8px 6px;
+    border-radius: 7px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .role-tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+  .form-group input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus { border-color: var(--accent2); }
+  .btn-login {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    margin-top: 4px;
+  }
+  .btn-login:hover { opacity: 0.88; }
+  .error-msg {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--danger);
+    margin-top: 14px;
+    display: none;
+  }
+  .footer-note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 20px;
+  }
+  .loading { opacity: 0.6; pointer-events: none; }
+  #loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="login-wrap">
+  <div class="logo-area">
+    <div class="logo-badge">
+      <div class="logo-icon">TS</div>
+      <span class="logo-text">Trackable Solution</span>
+    </div>
+    <h1>Welcome back</h1>
+    <p class="subtitle">Ceylon Business Appliances · Trial Feedback System</p>
+  </div>
 
-export const firebaseConfig = {
-  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
-  authDomain: "trackable-progress.firebaseapp.com",
-  projectId: "trackable-progress",
-  storageBucket: "trackable-progress.firebasestorage.app",
-  messagingSenderId: "961877401670",
-  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
-};
+  <div class="card">
+    <div class="role-tabs">
+      <button class="role-tab active" onclick="setRole('coordinator',this)">Coordinator</button>
+      <button class="role-tab" onclick="setRole('developer',this)">IT Developer</button>
+      <button class="role-tab" onclick="setRole('management',this)">Management</button>
+    </div>
 
-// ════════════════════════════════════════════
-// 🔧 REPLACE THESE WITH YOUR EMAILJS KEYS
-// ════════════════════════════════════════════
-export const emailjsConfig = {
-  publicKey: "M0fN-ZhFBMo2K-psq",
-  serviceId: "service_z6bjou4",
-  templateId: "template_s023zsn"
-};
+    <div class="form-group">
+      <label>Email address</label>
+      <input type="email" id="email" placeholder="you@ceylonba.com" autocomplete="email"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Sign in</button>
+    <div class="error-msg" id="err"></div>
+    <div id="loading-spinner">Signing in…</div>
+  </div>
 
-// ════════════════════════════════════════════
-// 🔧 IT DEVELOPER EMAIL ADDRESSES
-// ════════════════════════════════════════════
-export const IT_DEVELOPER_EMAILS = [
-  "thiranperera29@gmail.com",
-  "chathura.hewage11@gmail.com"
-];
+  <p class="footer-note">Contact your coordinator if you need access.</p>
+</div>
 
-// ════════════════════════════════════════════
-// App constants
-// ════════════════════════════════════════════
-export const DEPARTMENTS = [];
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-export const FEEDBACK_TYPES = {
-  doubt:      { label: 'Doubt',      color: 'badge-doubt'      },
-  suggestion: { label: 'Suggestion', color: 'badge-suggestion' },
-  bug:        { label: 'Bug',        color: 'badge-bug'        }
-};
+  // ════════════════════════════════════════════
+  // 🔧 REPLACE THESE WITH YOUR FIREBASE CONFIG
+  // Get from: Firebase Console → Project Settings → Your apps → Web app
+  // ════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+    authDomain: "trackable-progress.firebaseapp.com",
+    projectId: "trackable-progress",
+    storageBucket: "trackable-progress.firebasestorage.app",
+    messagingSenderId: "961877401670",
+    appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+  };
 
-export const STATUS = {
-  pending:     { label: 'Pending',     color: 'badge-pending'  },
-  'in-progress': { label: 'In progress', color: 'badge-progress' },
-  resolved:    { label: 'Resolved',   color: 'badge-resolved' }
-};
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-// ════════════════════════════════════════════
-// Helper utilities
-// ════════════════════════════════════════════
-export function formatDate(ts) {
-  if (!ts) return '—';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+  // ── Role tab state (module-scoped, exposed via window for onclick) ──
+  let currentRole = 'coordinator';
+  window.setRole = function(role, el) {
+    currentRole = role;
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    // Clear any lingering error when user switches tabs
+    document.getElementById('err').style.display = 'none';
+  };
 
-export function timeAgo(ts) {
-  if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  const diff = Date.now() - d.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-export function badge(type, map) {
-  const item = map[type] || { label: type, color: 'badge-doubt' };
-  return `<span class="badge ${item.color}">${item.label}</span>`;
-}
-
-export function deptColor(dept) {
-  const colors = ['#2ea84f','#388bfd','#d29922','#bc8cff','#f85149','#58a6ff','#79c0ff','#56d364','#ffa657'];
-  const idx = [...dept].reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
-  return colors[idx];
-}
-
-export function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
-// ════════════════════════════════════════════
-// requireAuth — call this at the top of each protected page
-//
-// Usage in your page scripts:
-//
-//   import { ..., onAuthStateChanged, signOut } from "firebase/auth";
-//   import { ..., doc, getDoc } from "firebase/firestore";
-//   import { firebaseConfig, requireAuth } from "../js/config.js";
-//
-//   requireAuth(
-//     auth, db,
-//     onAuthStateChanged, signOut,
-//     doc, getDoc,
-//     ['coordinator'],          // allowed roles
-//     '../index.html'           // redirect target (optional)
-//   ).then(({ user, userData }) => {
-//     // page is authenticated — start your logic here
-//   });
-// ════════════════════════════════════════════
-export function requireAuth(
-  auth,
-  db,
-  onAuthStateChanged,
-  signOut,
-  docFn,
-  getDocFn,
-  allowedRoles = [],
-  redirectTo = '../index.html'
-) {
-  return new Promise((resolve) => {
-    onAuthStateChanged(auth, async (user) => {
-
-      // 1. Not logged in at all
-      if (!user) {
-        window.location.href = redirectTo;
-        return;
+  // Auto-redirect if already logged in
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (!snap.exists()) {
+          // Auth record exists but no Firestore doc — sign out and stop
+          await signOut(auth);
+          return;
+        }
+        redirectByRole(snap.data().role);
+      } catch (e) {
+        // Firestore unavailable — sign out to avoid stuck state
+        await signOut(auth);
       }
-
-      // 2. Firestore document doesn't exist yet (user created in Auth but
-      //    the /users/{uid} doc hasn't been written — causes the bug-log loop)
-      const snap = await getDocFn(docFn(db, 'users', user.uid));
-      if (!snap.exists()) {
-        await signOut(auth);          // sign out the incomplete user
-        window.location.href = redirectTo;
-        return;
-      }
-
-      const userData = snap.data();
-
-      // 3. User exists but doesn't have an allowed role
-      if (allowedRoles.length && !allowedRoles.includes(userData.role)) {
-        window.location.href = redirectTo;
-        return;
-      }
-
-      // 4. All checks passed
-      resolve({ user, userData });
-    });
+    }
   });
-}
+
+  window.doLogin = async function() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const spinner  = document.getElementById('loading-spinner');
+    const loginBtn = document.querySelector('.btn-login');
+
+    document.getElementById('err').style.display = 'none';
+
+    if (!email || !password) { showErr('Please enter your email and password.'); return; }
+
+    // Basic client-side email format check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showErr('Please enter a valid email address.');
+      return;
+    }
+
+    loginBtn.classList.add('loading');
+    spinner.style.display = 'block';
+
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      let snap;
+      try {
+        snap = await getDoc(doc(db, 'users', cred.user.uid));
+      } catch (firestoreErr) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        loginBtn.classList.remove('loading');
+        showErr('Unable to verify account. Check your connection and try again.');
+        return;
+      }
+
+      // If no Firestore doc exists, reject the login
+      if (!snap.exists()) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        loginBtn.classList.remove('loading');
+        showErr('Account not recognized. Contact your coordinator for access.');
+        return;
+      }
+
+      const role = snap.data().role;
+
+      // Map tab selection to allowed roles
+      const roleTabMap = {
+        coordinator: ['coordinator'],
+        developer:   ['developer', 'it', 'it_developer'],
+        management:  ['management']
+      };
+
+      if (!roleTabMap[currentRole].includes(role)) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        loginBtn.classList.remove('loading');
+        showErr('This account does not have access to the selected role tab.');
+        return;
+      }
+
+      redirectByRole(role);
+    } catch(e) {
+      spinner.style.display = 'none';
+      loginBtn.classList.remove('loading');
+      // Surface friendlier messages for common Firebase auth error codes
+      if (e.code === 'auth/too-many-requests') {
+        showErr('Too many failed attempts. Please wait a moment before trying again.');
+      } else if (e.code === 'auth/network-request-failed') {
+        showErr('Network error. Check your connection and try again.');
+      } else {
+        showErr('Invalid email or password. Please try again.');
+      }
+    }
+  };
+
+  function showErr(msg) {
+    const el = document.getElementById('err');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function redirectByRole(role) {
+    if (role === 'developer') window.location.href = 'pages/developer.html';
+    else if (role === 'management') window.location.href = 'pages/management.html';
+    else window.location.href = 'pages/dashboard.html';
+  }
+
+  // Allow Enter key to submit — only when focus is on an input field
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target === document.body)) {
+      window.doLogin();
+    }
+  });
+</script>
+</body>
+</html>
