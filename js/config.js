@@ -59,6 +59,8 @@ export function timeAgo(ts) {
   if (!ts) return '';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   const diff = Date.now() - d.getTime();
+  // Handle future timestamps gracefully
+  if (diff < 0) return 'just now';
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -121,9 +123,19 @@ export function requireAuth(
         return;
       }
 
-      // 2. Firestore document doesn't exist yet (user created in Auth but
+      // 2. Firestore document check — wrapped to handle network failures
+      let snap;
+      try {
+        snap = await getDocFn(docFn(db, 'users', user.uid));
+      } catch (e) {
+        // Network or permission error — sign out to avoid a stuck auth state
+        await signOut(auth);
+        window.location.href = redirectTo;
+        return;
+      }
+
+      // 3. Firestore doc doesn't exist (user created in Auth but
       //    the /users/{uid} doc hasn't been written — causes the bug-log loop)
-      const snap = await getDocFn(docFn(db, 'users', user.uid));
       if (!snap.exists()) {
         await signOut(auth);          // sign out the incomplete user
         window.location.href = redirectTo;
@@ -132,13 +144,13 @@ export function requireAuth(
 
       const userData = snap.data();
 
-      // 3. User exists but doesn't have an allowed role
+      // 4. User exists but doesn't have an allowed role
       if (allowedRoles.length && !allowedRoles.includes(userData.role)) {
         window.location.href = redirectTo;
         return;
       }
 
-      // 4. All checks passed
+      // 5. All checks passed
       resolve({ user, userData });
     });
   });
