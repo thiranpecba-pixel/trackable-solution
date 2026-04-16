@@ -345,7 +345,7 @@ function renderDeptGrid() {
 let currentTimelineScope = 'overall'; // 'overall' | dept name
 
 function renderTimelineDeptTabs() {
-  const deptNames = [...new Set(allTimeline.filter(p => p.scope && p.scope !== 'overall').map(p => p.scope))].sort();
+  const deptNames = [...new Set(allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '').map(p => p.scope))].sort();
   const tabsEl = document.getElementById('tl-dept-tabs');
   if (!tabsEl) return;
   tabsEl.innerHTML = deptNames.map(d =>
@@ -366,8 +366,9 @@ function renderTimeline() {
   renderTimelineDeptTabs();
 
   const isOverall = currentTimelineScope === 'overall';
+  // Phases with no scope, scope='overall', or scope='' all belong to Overall
   const phasesForScope = isOverall
-    ? allTimeline.filter(p => !p.scope || p.scope === 'overall')
+    ? allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '')
     : allTimeline.filter(p => p.scope === currentTimelineScope);
 
   // Update headings
@@ -412,7 +413,7 @@ function renderTimeline() {
 
   // Dept breakdown (only on Overall tab) — read-only, clickable to switch tab
   if (isOverall) {
-    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall');
+    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
     const depts = [...new Set(deptPhases.map(p => p.scope))].sort();
     const breakdownEl = document.getElementById('tl-dept-breakdown-list');
     if (!depts.length) {
@@ -672,12 +673,13 @@ window.generateReport = async function() {
   setFont(18,'bold'); setTxt(C.accent); doc.text(rate+'%', margin, 158);
   progressBar(margin, 161, col, rate, C.accent);
 
-  const phases  = allTimeline.filter(p=>p.status==='done').length;
-  const tlPct   = allTimeline.length ? Math.round(phases/allTimeline.length*100) : 0;
-  setFont(8); setTxt(C.muted); doc.text('Project timeline completion', margin, 172);
+  const overallPhasesMgmt = allTimeline.filter(p=>!p.scope||p.scope==='overall'||p.scope==='');
+  const phases  = overallPhasesMgmt.filter(p=>p.status==='done').length;
+  const tlPct   = overallPhasesMgmt.length ? Math.round(phases/overallPhasesMgmt.length*100) : 0;
+  setFont(8); setTxt(C.muted); doc.text('Overall timeline completion', margin, 172);
   setFont(18,'bold'); setTxt(C.purple); doc.text(tlPct+'%', margin, 182);
   progressBar(margin, 185, col, tlPct, C.purple);
-  setFont(7); setTxt(C.muted); doc.text(`${phases} of ${allTimeline.length} phases complete`, margin, 191);
+  setFont(7); setTxt(C.muted); doc.text(`${phases} of ${overallPhasesMgmt.length} overall phases complete`, margin, 191);
 
   setFont(8); setTxt(C.muted);
   doc.text(`Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`, margin, H-20);
@@ -758,12 +760,14 @@ window.generateReport = async function() {
   // ── PAGE 4: TIMELINE ──
   newPage();
   setFont(14,'bold'); setTxt(C.white); doc.text('Project Timeline', margin, y); y += 10;
-  sectionHeader('Trial & Launch Phases');
 
-  if (!allTimeline.length) {
-    setFont(9); setTxt(C.muted); doc.text('No phases recorded yet.', margin, y+6); y += 14;
-  } else {
-    allTimeline.forEach(p => {
+  // Helper to render phase cards (shared for both overall and dept sections)
+  function renderPhaseCards(phases) {
+    if (!phases.length) {
+      setFont(9); setTxt(C.muted); doc.text('No phases recorded yet.', margin, y+6); y += 14;
+      return;
+    }
+    phases.forEach(p => {
       checkY(22);
       const sc = p.status==='done'?C.accent:p.status==='wip'?C.blue:C.muted;
       const sl = p.status==='done'?'DONE':p.status==='wip'?'IN PROGRESS':'PLANNED';
@@ -771,9 +775,42 @@ window.generateReport = async function() {
       setFill(sc); doc.rect(margin, y, 3, 18, 'F');
       setFont(8,'bold'); setTxt(C.white); doc.text(p.name, margin+7, y+6);
       setFont(6.5); setTxt(sc); doc.text('● '+sl, W-margin-2, y+6, {align:'right'});
-      setFont(6.5); setTxt(C.muted); doc.text(p.date, margin+7, y+11.5);
+      setFont(6.5); setTxt(C.muted); doc.text(p.date||'', margin+7, y+11.5);
       if (p.description) doc.text((p.description.length>90?p.description.slice(0,88)+'…':p.description), margin+7, y+16);
       y += 22;
+    });
+  }
+
+  // ── Overall phases ──
+  const tlOverall = allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '');
+  const tlOverallDone = tlOverall.filter(p=>p.status==='done').length;
+  const tlOverallPct  = tlOverall.length ? Math.round(tlOverallDone/tlOverall.length*100) : 0;
+
+  sectionHeader('Overall — Trial & Launch Phases');
+  checkY(14);
+  setFont(7); setTxt(C.muted); doc.text(`Completion: ${tlOverallPct}%  (${tlOverallDone} of ${tlOverall.length} phases done)`, margin, y+5);
+  progressBar(margin, y+8, col, tlOverallPct, C.purple);
+  y += 16;
+  renderPhaseCards(tlOverall);
+
+  // ── Department-specific phases ──
+  const tlDeptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
+  const tlDeptNames  = [...new Set(tlDeptPhases.map(p => p.scope))].sort();
+
+  if (tlDeptNames.length) {
+    tlDeptNames.forEach(deptName => {
+      const dPhases = tlDeptPhases.filter(p => p.scope === deptName);
+      const dDone   = dPhases.filter(p=>p.status==='done').length;
+      const dPct    = dPhases.length ? Math.round(dDone/dPhases.length*100) : 0;
+      const dc      = deptColor(deptName);
+
+      checkY(28);
+      sectionHeader(`${deptName} — Department Phases`);
+      checkY(14);
+      setFont(7); setTxt(C.muted); doc.text(`Completion: ${dPct}%  (${dDone} of ${dPhases.length} phases done)`, margin, y+5);
+      progressBar(margin, y+8, col, dPct, dc);
+      y += 16;
+      renderPhaseCards(dPhases);
     });
   }
 
