@@ -49,7 +49,7 @@
     <div class="page-content">
       <div id="alert-area"></div>
       <div class="toolbar">
-        <input class="search-input" placeholder="Search by description, department, worker…" oninput="filterFeedback(this.value)">
+        <input class="search-input" id="search-input" placeholder="Search by description, department, worker…" oninput="debouncedFilter()">
         <select class="form-select" style="width:auto" id="dept-filter" onchange="filterFeedback()">
           <option value="">All departments</option>
         </select>
@@ -245,9 +245,16 @@ function renderFeedback() {
     </div>`).join('');
 }
 
-window.filterFeedback = function(val) {
-  if (val !== undefined) searchVal = val;
+window.filterFeedback = function() {
+  searchVal = (document.getElementById('search-input')?.value || '').toLowerCase();
   renderFeedback();
+};
+
+// Debounce search input to avoid rendering on every keystroke
+let _filterTimer = null;
+window.debouncedFilter = function() {
+  clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(() => window.filterFeedback(), 200);
 };
 
 window.showSection = function(sec, el) {
@@ -365,9 +372,12 @@ window.postDevMessage = async function() {
 
 window.doSignOut = async () => { await signOut(auth); window.location.href = '../index.html'; };
 
-// expose search input reference
-window.document.addEventListener('DOMContentLoaded', () => {
-  window.document.querySelector('.search-input')?.setAttribute('id','search-input');
+// Close open modals on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('reply-modal')?.classList.contains('open')) closeReplyModal();
+    if (document.getElementById('dev-thread-modal')?.classList.contains('open')) closeDevThread();
+  }
 });
 </script>
 </body>
