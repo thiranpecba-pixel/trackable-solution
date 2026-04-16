@@ -1619,11 +1619,22 @@ window.postThreadMessage = async function() {
   document.getElementById('thread-alert').innerHTML = '';
 };
 
+let _alertTimer = null;
 function showAlert(msg, type) {
   const el = document.getElementById('alert-area');
   el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
-  setTimeout(() => el.innerHTML = '', 4000);
+  clearTimeout(_alertTimer);
+  _alertTimer = setTimeout(() => { el.innerHTML = ''; }, 4000);
 }
+
+// Close any open modal on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('add-modal')?.classList.contains('open'))    closeAddModal();
+  if (document.getElementById('edit-modal')?.classList.contains('open'))   closeEditModal();
+  if (document.getElementById('thread-modal')?.classList.contains('open')) closeThreadModal();
+  if (document.getElementById('tl-modal')?.classList.contains('open'))     closeTimelineModal();
+});
 </script>
 </body>
 </html>
