@@ -184,21 +184,43 @@
 
       <!-- ══ TIMELINE ══ -->
       <div id="sec-timeline" class="section-panel" style="display:none">
-        <div class="grid-2">
-          <div class="card">
-            <div class="section-hdr">
-              <div><div class="section-title">Trial & launch phases</div><div class="section-sub">Project milestone tracker</div></div>
-              <button class="btn btn-sm" onclick="openTimelineModal()">+ Add phase</button>
-            </div>
-            <div class="timeline" id="timeline-list"></div>
+
+        <!-- Scope tabs: Overall + one tab per department -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button class="filter-chip active" id="tl-tab-overall" onclick="switchTimelineScope('overall',this)">⊞ Overall</button>
+            <div id="tl-dept-tabs" style="display:contents"></div>
           </div>
+          <button class="btn btn-sm btn-primary" onclick="openTimelineModal()" style="white-space:nowrap">+ Add phase</button>
+        </div>
+
+        <div class="grid-2">
+          <!-- Left: timeline phases list -->
+          <div class="card">
+            <div class="section-hdr" style="margin-bottom:16px">
+              <div>
+                <div class="section-title" id="tl-scope-title">Overall — Trial &amp; launch phases</div>
+                <div class="section-sub" id="tl-scope-sub">All departments · Project milestone tracker</div>
+              </div>
+            </div>
+            <div class="timeline" id="timeline-list"><div class="text-sm text-muted">No phases added yet</div></div>
+          </div>
+
+          <!-- Right: completion stats -->
           <div>
             <div class="card mb-16">
-              <div class="section-title mb-8">Overall completion</div>
+              <div class="section-title mb-8" id="tl-pct-label">Overall completion</div>
               <div style="font-size:36px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px" id="overall-pct">0%</div>
               <div class="progress-bar mb-8"><div class="progress-fill" id="overall-bar" style="width:0%;background:var(--accent)"></div></div>
               <div class="text-sm text-muted" id="overall-sub"></div>
             </div>
+
+            <!-- Department-wise mini breakdown (only visible on Overall tab) -->
+            <div class="card mb-16" id="tl-dept-breakdown">
+              <div class="section-title mb-12">By department</div>
+              <div id="tl-dept-breakdown-list"><div class="text-sm text-muted">No department phases yet</div></div>
+            </div>
+
             <div class="card">
               <div class="section-title mb-8">Generate report</div>
               <div class="text-sm text-muted mb-16">Share progress summary with management and workers</div>
@@ -280,6 +302,13 @@
 <div class="modal-overlay" id="tl-modal">
   <div class="modal">
     <div class="modal-hdr"><h3 id="tl-modal-title">Add timeline phase</h3><button class="modal-close" onclick="closeTimelineModal()">×</button></div>
+    <div class="form-group">
+      <label class="form-label">Scope</label>
+      <select class="form-select" id="tl-scope">
+        <option value="overall">⊞ Overall (all departments)</option>
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Choose "Overall" for project-wide phases, or pick a department for department-specific milestones.</div>
+    </div>
     <div class="form-group"><label class="form-label">Phase name</label><input class="form-input" id="tl-name" placeholder="e.g. UAT & sign-off"></div>
     <div class="form-group"><label class="form-label">Date range</label><input class="form-input" id="tl-date" placeholder="e.g. May 1 – May 10, 2025"></div>
     <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="tl-desc" placeholder="Brief description of this phase"></div>
@@ -572,35 +601,111 @@ function renderDeptGrid() {
   }).join('');
 }
 
+// ── Timeline scope state ──
+let currentTimelineScope = 'overall'; // 'overall' | dept name
+
+function renderTimelineDeptTabs() {
+  // Render one tab button per department that has at least one phase
+  const deptNames = [...new Set(allTimeline.filter(p => p.scope && p.scope !== 'overall').map(p => p.scope))].sort();
+  const tabsEl = document.getElementById('tl-dept-tabs');
+  if (!tabsEl) return;
+  tabsEl.innerHTML = deptNames.map(d =>
+    `<button class="filter-chip ${currentTimelineScope === d ? 'active' : ''}" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',this)">${d}</button>`
+  ).join('');
+  // Update overall tab active state
+  const overall = document.getElementById('tl-tab-overall');
+  if (overall) overall.classList.toggle('active', currentTimelineScope === 'overall');
+}
+
+window.switchTimelineScope = function(scope, el) {
+  currentTimelineScope = scope;
+  // Update active tab styles
+  document.querySelectorAll('#tl-dept-tabs .filter-chip, #tl-tab-overall').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderTimeline();
+};
+
 function renderTimeline() {
+  renderTimelineDeptTabs();
+
+  const isOverall = currentTimelineScope === 'overall';
+  const phasesForScope = isOverall
+    ? allTimeline.filter(p => !p.scope || p.scope === 'overall')
+    : allTimeline.filter(p => p.scope === currentTimelineScope);
+
+  // Update headings
+  document.getElementById('tl-scope-title').textContent = isOverall
+    ? 'Overall — Trial & launch phases'
+    : `${currentTimelineScope} — Timeline phases`;
+  document.getElementById('tl-scope-sub').textContent = isOverall
+    ? 'All departments · Project milestone tracker'
+    : `Department-specific milestone tracker`;
+  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall completion' : `${currentTimelineScope} completion`;
+
+  // Show/hide dept breakdown panel
+  document.getElementById('tl-dept-breakdown').style.display = isOverall ? '' : 'none';
+
+  // Completion stats for current scope
   const el = document.getElementById('timeline-list');
-  if (!allTimeline.length) { el.innerHTML = '<div class="text-sm text-muted">No phases added yet</div>'; return; }
-  const done = allTimeline.filter(p => p.status === 'done').length;
-  const pct = Math.round(done / allTimeline.length * 100);
-  document.getElementById('overall-pct').textContent = pct + '%';
-  document.getElementById('overall-bar').style.width = pct + '%';
-  document.getElementById('overall-sub').textContent = `${done} of ${allTimeline.length} phases complete`;
-  el.innerHTML = allTimeline.map(p => `
-    <div class="tl-item">
-      <div class="tl-dot ${p.status}"></div>
-      <div class="tl-body">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="tl-title">${p.name}</span>
-          ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+  if (!phasesForScope.length) {
+    el.innerHTML = '<div class="text-sm text-muted">No phases added yet for this scope</div>';
+    document.getElementById('overall-pct').textContent = '0%';
+    document.getElementById('overall-bar').style.width = '0%';
+    document.getElementById('overall-sub').textContent = '—';
+  } else {
+    const done = phasesForScope.filter(p => p.status === 'done').length;
+    const pct = Math.round(done / phasesForScope.length * 100);
+    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+    document.getElementById('overall-pct').textContent = pct + '%';
+    document.getElementById('overall-bar').style.width = pct + '%';
+    document.getElementById('overall-bar').style.background = color;
+    document.getElementById('overall-sub').textContent = `${done} of ${phasesForScope.length} phases complete`;
+    el.innerHTML = phasesForScope.map(p => `
+      <div class="tl-item">
+        <div class="tl-dot ${p.status}"></div>
+        <div class="tl-body">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="tl-title">${p.name}</span>
+            ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+          </div>
+          <div class="tl-date">${p.date}</div>
+          <div class="tl-desc">${p.description}</div>
         </div>
-        <div class="tl-date">${p.date}</div>
-        <div class="tl-desc">${p.description}</div>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <select class="form-select" style="width:auto;font-size:12px;padding:4px 8px" onchange="updateTimelineStatus('${p.id}',this.value)">
-          <option value="plan" ${p.status==='plan'?'selected':''}>Planned</option>
-          <option value="wip" ${p.status==='wip'?'selected':''}>In progress</option>
-          <option value="done" ${p.status==='done'?'selected':''}>Done</option>
-        </select>
-        <button class="btn btn-sm" style="color:var(--accent2);padding:2px 8px" onclick="editTimeline('${p.id}')">✎</button>
-        <button class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="deleteTimeline('${p.id}')">✕</button>
-      </div>
-    </div>`).join('');
+        <div style="display:flex;gap:6px;align-items:center">
+          <select class="form-select" style="width:auto;font-size:12px;padding:4px 8px" onchange="updateTimelineStatus('${p.id}',this.value)">
+            <option value="plan" ${p.status==='plan'?'selected':''}>Planned</option>
+            <option value="wip" ${p.status==='wip'?'selected':''}>In progress</option>
+            <option value="done" ${p.status==='done'?'selected':''}>Done</option>
+          </select>
+          <button class="btn btn-sm" style="color:var(--accent2);padding:2px 8px" onclick="editTimeline('${p.id}')">✎</button>
+          <button class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="deleteTimeline('${p.id}')">✕</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // Dept breakdown (only on Overall tab)
+  if (isOverall) {
+    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall');
+    const depts = [...new Set(deptPhases.map(p => p.scope))].sort();
+    const breakdownEl = document.getElementById('tl-dept-breakdown-list');
+    if (!depts.length) {
+      breakdownEl.innerHTML = '<div class="text-sm text-muted">No department-specific phases yet</div>';
+    } else {
+      breakdownEl.innerHTML = depts.map(d => {
+        const items = deptPhases.filter(p => p.scope === d);
+        const dDone = items.filter(p => p.status === 'done').length;
+        const dPct = items.length ? Math.round(dDone / items.length * 100) : 0;
+        const dColor = dPct === 100 ? 'var(--accent)' : dPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+        return `<div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+            <span style="font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',null)">${d}</span>
+            <span style="font-size:12px;color:var(--muted)">${dDone}/${items.length} done</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${dPct}%;background:${dColor}"></div></div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 async function loadUsers() {
@@ -649,6 +754,14 @@ window.openTimelineModal = () => {
   document.getElementById('tl-date').value = '';
   document.getElementById('tl-desc').value = '';
   document.getElementById('tl-status').value = 'plan';
+  // Populate scope dropdown with Overall + all departments
+  const scopeSel = document.getElementById('tl-scope');
+  scopeSel.innerHTML = '<option value="overall">⊞ Overall (all departments)</option>' +
+    allDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+  // Pre-select the currently active tab scope
+  scopeSel.value = currentTimelineScope && allDepts.find(d => d.name === currentTimelineScope)
+    ? currentTimelineScope : 'overall';
+  scopeSel.disabled = false;
   document.getElementById('tl-modal').classList.add('open');
 };
 
@@ -667,6 +780,12 @@ window.editTimeline = function(id) {
   document.getElementById('tl-date').value = p.date || '';
   document.getElementById('tl-desc').value = p.description || '';
   document.getElementById('tl-status').value = p.status || 'plan';
+  // Populate & lock scope (can't change scope on existing phases)
+  const scopeSel = document.getElementById('tl-scope');
+  scopeSel.innerHTML = '<option value="overall">⊞ Overall (all departments)</option>' +
+    allDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+  scopeSel.value = p.scope || 'overall';
+  scopeSel.disabled = true; // prevent changing scope after creation
   document.getElementById('tl-modal').classList.add('open');
 };
 
@@ -714,12 +833,15 @@ window.submitTimeline = async function() {
   const date = document.getElementById('tl-date').value.trim();
   const desc = document.getElementById('tl-desc').value.trim();
   const status = document.getElementById('tl-status').value;
+  const scope = document.getElementById('tl-scope').value || 'overall';
   if (!name || !date) return;
   if (editingTimelineId) {
     await updateDoc(doc(db, 'timeline', editingTimelineId), { name, date, description: desc, status });
     showAlert('Phase updated successfully!', 'success');
   } else {
-    await addDoc(collection(db, 'timeline'), { name, date, description: desc, status, order: allTimeline.length });
+    await addDoc(collection(db, 'timeline'), { name, date, description: desc, status, scope, order: allTimeline.length });
+    // Switch to the tab of the newly added scope
+    currentTimelineScope = scope;
     showAlert('Phase added!', 'success');
   }
   closeTimelineModal();
