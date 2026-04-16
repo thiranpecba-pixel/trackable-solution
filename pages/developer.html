@@ -227,7 +227,18 @@ function renderFeedback() {
             </div>
           </div>
           ${f.itReply
-            ? `<div class="it-reply"><div class="it-reply-label">Your reply</div><div class="it-reply-text">${f.itReply}</div></div>`
+            ? `<div class="it-reply"><div class="it-reply-label">Your reply</div><div class="it-reply-text">${f.itReply}</div>
+               <div style="margin-top:10px">
+                 ${f.workerTestStatus === 'confirmed'
+                   ? `<span style="font-size:12px;font-weight:600;color:var(--accent);background:rgba(46,168,79,0.1);border:1px solid rgba(46,168,79,0.25);padding:3px 10px;border-radius:99px">✓ Worker confirmed — fix is working</span>`
+                   : f.workerTestStatus === 'rejected'
+                   ? `<div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);border-radius:8px;padding:10px;margin-top:4px">
+                        <div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:4px">✕ Worker says it's still not working</div>
+                        ${f.workerRejectNote ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">"${f.workerRejectNote}"</div>` : ''}
+                        <div style="font-size:11px;color:var(--danger);margin-top:6px">⚠ This item has been re-opened — please investigate and reply again.</div>
+                      </div>`
+                   : `<span style="font-size:12px;color:var(--warn);background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.25);padding:3px 10px;border-radius:99px">⏳ Waiting for worker to confirm they tested</span>`}
+               </div></div>`
             : '<div class="awaiting-reply">No reply yet — click Reply to respond</div>'}
         </div>
       </div>

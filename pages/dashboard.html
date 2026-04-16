@@ -17,8 +17,9 @@
     </div>
     <div class="nav-section">
       <div class="nav-label">Main</div>
-      <button class="nav-item active" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
+      <button class="nav-item" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
       <button class="nav-item" onclick="showSection('feedback',this)"><span class="icon">◎</span> Feedback Log</button>
+      <button class="nav-item" onclick="showSection('engagement',this)"><span class="icon">◈</span> Engagement</button>
       <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
       <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
       <div class="nav-label" style="margin-top:16px">Admin</div>
@@ -91,7 +92,82 @@
         </div>
       </div>
 
-      <!-- ══ DEPARTMENTS ══ -->
+      <!-- ══ ENGAGEMENT ══ -->
+      <div id="sec-engagement" class="section-panel" style="display:none">
+
+        <!-- Top metric row -->
+        <div class="metric-grid" style="margin-bottom:16px">
+          <div class="metric-card">
+            <div class="metric-label">Active today</div>
+            <div class="metric-value" id="eng-today" style="color:var(--accent)">—</div>
+            <div class="metric-sub">Depts with activity</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Active this week</div>
+            <div class="metric-value" id="eng-week" style="color:var(--accent2)">—</div>
+            <div class="metric-sub">Depts with activity</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Inactive 7+ days</div>
+            <div class="metric-value" id="eng-inactive" style="color:var(--danger)">—</div>
+            <div class="metric-sub">Need follow-up</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Total check-ins</div>
+            <div class="metric-value" id="eng-checkins" style="color:var(--purple)">—</div>
+            <div class="metric-sub">All time</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:16px">
+          <!-- Department activity status -->
+          <div class="card">
+            <div class="section-hdr mb-16">
+              <div>
+                <div class="section-title">Department activity</div>
+                <div class="section-sub">Last submission or check-in per department</div>
+              </div>
+              <button class="btn btn-sm" onclick="copyCheckinLink()" style="color:var(--accent2);border:1px solid rgba(56,139,253,0.3)">🔗 Check-in link</button>
+            </div>
+            <div id="eng-dept-list"><div class="empty-state"><p>No departments yet</p></div></div>
+          </div>
+
+          <!-- 14-day activity heatmap -->
+          <div class="card">
+            <div class="section-title mb-4">14-day activity heatmap</div>
+            <div class="section-sub mb-16">Feedback submissions per day across all departments</div>
+            <div id="eng-heatmap" style="display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin-bottom:12px"></div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+              <span>Less</span>
+              <div style="width:12px;height:12px;border-radius:2px;background:var(--surface2);border:1px solid var(--border)"></div>
+              <div style="width:12px;height:12px;border-radius:2px;background:rgba(46,168,79,0.25)"></div>
+              <div style="width:12px;height:12px;border-radius:2px;background:rgba(46,168,79,0.55)"></div>
+              <div style="width:12px;height:12px;border-radius:2px;background:var(--accent)"></div>
+              <span>More</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerts: inactive departments -->
+        <div class="card" id="eng-alerts-card" style="display:none;margin-bottom:16px">
+          <div class="section-hdr mb-12">
+            <div><div class="section-title" style="color:var(--danger)">⚠ Inactive departments</div>
+            <div class="section-sub">No activity in 7 or more days — follow up needed</div></div>
+          </div>
+          <div id="eng-alerts-list"></div>
+        </div>
+
+        <!-- Check-in log -->
+        <div class="card">
+          <div class="section-hdr mb-12">
+            <div><div class="section-title">Check-in log</div><div class="section-sub">Daily usage confirmations from departments</div></div>
+            <select class="form-select" style="width:auto;font-size:12px" id="checkin-dept-filter" onchange="renderCheckinLog()">
+              <option value="">All departments</option>
+            </select>
+          </div>
+          <div id="eng-checkin-log"><div class="empty-state"><p>No check-ins yet</p></div></div>
+        </div>
+      </div>
       <div id="sec-departments" class="section-panel" style="display:none">
         <div class="card mb-16">
           <div class="section-hdr">
@@ -294,7 +370,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [];
+let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [], allCheckins = [];
 let statusFilter = 'all', typeFilter = '', editingTimelineId = null;
 
 // ── Auth guard ──
@@ -314,23 +390,27 @@ function initApp() {
     const deptOpts = allDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
     document.getElementById('f-dept').innerHTML = '<option value="">Select department…</option>' + deptOpts;
     document.getElementById('dept-filter').innerHTML = '<option value="">All departments</option>' + deptOpts;
+    document.getElementById('checkin-dept-filter').innerHTML = '<option value="">All departments</option>' + deptOpts;
     renderDeptGrid();
     renderDeptProgress();
-  });
-  // Populate dept dropdowns
-  DEPARTMENTS.forEach(d => {
-    document.getElementById('f-dept').innerHTML += `<option value="${d}">${d}</option>`;
-    document.getElementById('dept-filter').innerHTML += `<option value="${d}">${d}</option>`;
+    renderEngagement();
   });
   // Listen to feedback
   onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')), snap => {
     allFeedback = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAll();
+    renderEngagement();
   });
   // Listen to timeline
   onSnapshot(query(collection(db, 'timeline'), orderBy('order')), snap => {
     allTimeline = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderTimeline();
+  });
+  // Listen to check-ins
+  onSnapshot(query(collection(db, 'checkins'), orderBy('createdAt', 'desc')), snap => {
+    allCheckins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderEngagement();
+    renderCheckinLog();
   });
   // Load users
   loadUsers();
@@ -429,6 +509,15 @@ window.renderFeedback = function() {
              </div>
            </div>`
         : `<div class="awaiting-reply">⏳ Awaiting IT developer response…</div>`}
+      ${f.itReply ? `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        ${f.workerTestStatus === 'confirmed'
+          ? `<span style="font-size:12px;font-weight:600;color:var(--accent);background:rgba(46,168,79,0.1);border:1px solid rgba(46,168,79,0.25);padding:3px 10px;border-radius:99px">✓ Worker confirmed tested</span>`
+          : f.workerTestStatus === 'rejected'
+          ? `<span style="font-size:12px;font-weight:600;color:var(--danger);background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);padding:3px 10px;border-radius:99px">✕ Worker: still not working</span>
+             ${f.workerRejectNote ? `<span style="font-size:11px;color:var(--muted)">"${f.workerRejectNote.slice(0,60)}${f.workerRejectNote.length>60?'…':''}"</span>` : ''}`
+          : `<span style="font-size:12px;color:var(--warn);background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.25);padding:3px 10px;border-radius:99px">⏳ Awaiting worker test confirmation</span>`}
+        <button class="btn btn-sm" style="font-size:11px;padding:3px 10px;color:var(--accent2);border:1px solid rgba(56,139,253,0.3)" onclick="copyTestLink('${f.id}','${f.workerName||''}')">🔗 Copy test link</button>
+      </div>` : ''}
     </div>`).join('');
 };
 
@@ -668,41 +757,515 @@ window.createUser = async function() {
   } catch(e) { showAlert('Error: ' + e.message, 'danger'); }
 };
 
-window.generateReport = function() {
+window.generateReport = async function() {
+  const btn = document.querySelector('[onclick="generateReport()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating PDF…'; }
+
+  // Dynamically load jsPDF and Chart.js
+  await Promise.all([
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js')
+  ]);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, H = 297;
+  const margin = 16, col = W - margin * 2;
+  let y = 0;
+
+  // ── Colour palette ──
+  const C = {
+    bg:      [13,  17,  23],
+    surface: [22,  27,  34],
+    surface2:[28,  33,  40],
+    border:  [48,  54,  61],
+    accent:  [46,  168, 79],
+    blue:    [56,  139, 253],
+    warn:    [210, 153, 34],
+    danger:  [248, 81,  73],
+    purple:  [188, 140, 255],
+    text:    [230, 237, 243],
+    muted:   [125, 133, 144],
+    white:   [255, 255, 255]
+  };
+
+  function setFill(col)   { doc.setFillColor(...col); }
+  function setDraw(col)   { doc.setDrawColor(...col); }
+  function setTxt(col)    { doc.setTextColor(...col); }
+  function setFont(sz, st='normal') { doc.setFontSize(sz); doc.setFont('helvetica', st); }
+
+  function newPage() {
+    doc.addPage();
+    // dark background
+    setFill(C.bg); doc.rect(0, 0, W, H, 'F');
+    // subtle left accent bar
+    setFill(C.accent); doc.rect(0, 0, 3, H, 'F');
+    y = 16;
+  }
+
+  function checkY(needed = 20) {
+    if (y + needed > H - 16) newPage();
+  }
+
+  function sectionHeader(title) {
+    checkY(16);
+    setFill(C.surface); doc.roundedRect(margin, y, col, 10, 2, 2, 'F');
+    setFill(C.accent);  doc.rect(margin, y, 3, 10, 'F');
+    setFont(9, 'bold'); setTxt(C.accent);
+    doc.text(title.toUpperCase(), margin + 7, y + 6.8);
+    y += 14;
+  }
+
+  function metricBox(x, bY, bW, bH, label, value, valueColor) {
+    setFill(C.surface); doc.roundedRect(x, bY, bW, bH, 3, 3, 'F');
+    setDraw(C.border);  doc.roundedRect(x, bY, bW, bH, 3, 3, 'S');
+    setFont(7);  setTxt(C.muted);   doc.text(label, x + bW/2, bY + 7, { align:'center' });
+    setFont(16, 'bold'); setTxt(valueColor); doc.text(String(value), x + bW/2, bY + 17, { align:'center' });
+  }
+
+  function progressBar(x, bY, bW, pct, color) {
+    const h = 3;
+    setFill(C.surface2); doc.roundedRect(x, bY, bW, h, 1, 1, 'F');
+    if (pct > 0) { setFill(color); doc.roundedRect(x, bY, bW * pct / 100, h, 1, 1, 'F'); }
+  }
+
+  function deptColor(dept) {
+    const colors = [C.accent,C.blue,C.warn,C.purple,C.danger,[88,166,255],[121,192,212],[86,211,100],[255,166,87]];
+    const idx = [...dept].reduce((a,c) => a + c.charCodeAt(0), 0) % colors.length;
+    return colors[idx];
+  }
+
+  function hexFromArr(arr) { return '#' + arr.map(v => v.toString(16).padStart(2,'0')).join(''); }
+
+  // ── Chart helper — renders Chart.js to canvas → PNG → jsPDF ──
+  async function chartToPng(type, data, options = {}) {
+    return new Promise(resolve => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600; canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      const chart = new Chart(ctx, { type, data, options: {
+        responsive: false, animation: false,
+        plugins: { legend: { labels: { color: '#e6edf3', font: { size: 11 } } } },
+        ...options
+      }});
+      setTimeout(() => { resolve(canvas.toDataURL('image/png')); chart.destroy(); }, 300);
+    });
+  }
+
+  // ════════════════════════════════════════
+  // PAGE 1 — COVER
+  // ════════════════════════════════════════
+  setFill(C.bg); doc.rect(0, 0, W, H, 'F');
+  setFill(C.accent); doc.rect(0, 0, W, 2, 'F'); // top accent line
+  setFill(C.accent); doc.rect(0, H-2, W, 2, 'F'); // bottom accent line
+
+  // Logo badge
+  setFill(C.surface); doc.roundedRect(margin, 40, 40, 14, 3, 3, 'F');
+  setFill(C.accent);  doc.roundedRect(margin+2, 42, 10, 10, 2, 2, 'F');
+  setFont(7, 'bold'); setTxt(C.white); doc.text('TS', margin+7, 48.5, { align:'center' });
+  setFont(9, 'bold'); setTxt(C.text);  doc.text('Trackable Solution', margin+15, 48.5);
+
+  setFont(28, 'bold'); setTxt(C.white);
+  doc.text('Progress Report', margin, 90);
+  setFont(11); setTxt(C.muted);
+  doc.text('Ceylon Business Appliances', margin, 100);
+
+  // Divider
+  setDraw(C.border); doc.setLineWidth(0.3); doc.line(margin, 106, W-margin, 106);
+
+  // Cover stats
   const total = allFeedback.length;
-  const done = allFeedback.filter(f => f.status === 'resolved').length;
-  const pct = total ? Math.round(done / total * 100) : 0;
-  const phases = allTimeline.filter(p => p.status === 'done').length;
-  const content = `TRACKABLE SOLUTION — PROGRESS REPORT
-Ceylon Business Appliances
-Generated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const done  = allFeedback.filter(f => f.status === 'resolved').length;
+  const pend  = allFeedback.filter(f => f.status === 'pending').length;
+  const inprog= allFeedback.filter(f => f.status === 'in-progress').length;
+  const rate  = total ? Math.round(done/total*100) : 0;
+  const bW = (col - 9) / 4;
+  metricBox(margin,       114, bW, 24, 'TOTAL',       total,   C.text);
+  metricBox(margin+bW+3,  114, bW, 24, 'RESOLVED',    done,    C.accent);
+  metricBox(margin+bW*2+6,114, bW, 24, 'PENDING',     pend,    C.warn);
+  metricBox(margin+bW*3+9,114, bW, 24, 'IN PROGRESS', inprog,  C.blue);
 
-SUMMARY
-Total feedback entries: ${total}
-Resolved: ${done} (${pct}%)
-Pending: ${allFeedback.filter(f=>f.status==='pending').length}
-In progress: ${allFeedback.filter(f=>f.status==='in-progress').length}
+  // Resolution progress
+  setFont(8); setTxt(C.muted); doc.text('Overall resolution rate', margin, 148);
+  setFont(18, 'bold'); setTxt(C.accent); doc.text(rate + '%', margin, 158);
+  progressBar(margin, 161, col, rate, C.accent);
 
-TIMELINE: ${phases} of ${allTimeline.length} phases complete
+  // Timeline strip
+  const phases = allTimeline.filter(p=>p.status==='done').length;
+  const tlPct  = allTimeline.length ? Math.round(phases/allTimeline.length*100) : 0;
+  setFont(8); setTxt(C.muted); doc.text('Timeline completion', margin, 172);
+  setFont(18, 'bold'); setTxt(C.purple); doc.text(tlPct + '%', margin, 182);
+  progressBar(margin, 185, col, tlPct, C.purple);
+  setFont(7); setTxt(C.muted);
+  doc.text(`${phases} of ${allTimeline.length} phases complete`, margin, 191);
 
-DEPARTMENT BREAKDOWN
-${DEPARTMENTS.map(d => {
-  const items = allFeedback.filter(f => f.dept === d);
-  const r = items.filter(f => f.status === 'resolved').length;
-  const p2 = items.length ? Math.round(r/items.length*100) : 0;
-  return `  ${d}: ${items.length} entries — ${r} resolved (${p2}%)`;
-}).join('\n')}
+  // Generated date
+  setFont(8); setTxt(C.muted);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`, margin, H-20);
+  doc.text('Confidential — Internal Use Only', W-margin, H-20, { align:'right' });
 
-FEEDBACK DETAILS
-${allFeedback.map(f => `[${f.status.toUpperCase()}] [${f.type.toUpperCase()}] ${f.dept} — ${f.workerName}
-  ${f.description}${f.itReply ? '\n  IT Reply: ' + f.itReply : ''}`).join('\n\n')}
-`;
-  const blob = new Blob([content], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `trackable-report-${new Date().toISOString().split('T')[0]}.txt`;
-  a.click();
+  // ════════════════════════════════════════
+  // PAGE 2 — CHARTS
+  // ════════════════════════════════════════
+  newPage();
+  setFont(14, 'bold'); setTxt(C.white); doc.text('Analytics Overview', margin, y); y += 10;
+
+  // Donut — status breakdown
+  const statusPng = await chartToPng('doughnut', {
+    labels: ['Resolved','In Progress','Pending'],
+    datasets: [{ data: [done, inprog, pend],
+      backgroundColor: [hexFromArr(C.accent), hexFromArr(C.blue), hexFromArr(C.warn)],
+      borderColor: hexFromArr(C.surface2), borderWidth: 3 }]
+  }, { plugins: { legend: { position:'right' } } });
+
+  // Bar — type breakdown
+  const bugs   = allFeedback.filter(f=>f.type==='bug').length;
+  const sugg   = allFeedback.filter(f=>f.type==='suggestion').length;
+  const doubt  = allFeedback.filter(f=>f.type==='doubt').length;
+  const typePng = await chartToPng('bar', {
+    labels: ['Bugs','Suggestions','Doubts'],
+    datasets: [{ label:'Count',
+      data: [bugs, sugg, doubt],
+      backgroundColor: [hexFromArr(C.danger), hexFromArr(C.purple), hexFromArr(C.muted)],
+      borderRadius: 6 }]
+  }, { scales: { x:{ ticks:{color:'#7d8590'}, grid:{color:'#30363d'} }, y:{ ticks:{color:'#7d8590'}, grid:{color:'#30363d'} } }, plugins:{ legend:{display:false} } });
+
+  // Priority bar chart
+  const prioData = ['critical','high','medium','low'].map(p => allFeedback.filter(f=>(f.priority||'medium')===p).length);
+  const prioPng = await chartToPng('bar', {
+    labels: ['Critical','High','Medium','Low'],
+    datasets: [{ label:'Count', data: prioData,
+      backgroundColor: [hexFromArr(C.danger), hexFromArr(C.warn), hexFromArr(C.blue), hexFromArr(C.muted)],
+      borderRadius: 6 }]
+  }, { indexAxis:'y', scales:{ x:{ticks:{color:'#7d8590'},grid:{color:'#30363d'}}, y:{ticks:{color:'#7d8590'},grid:{color:'#30363d'}} }, plugins:{legend:{display:false}} });
+
+  // Dept resolution bar
+  const depts = [...new Set(allFeedback.map(f=>f.dept))].filter(Boolean);
+  const deptRes = depts.map(d => {
+    const items = allFeedback.filter(f=>f.dept===d);
+    return items.length ? Math.round(items.filter(f=>f.status==='resolved').length/items.length*100) : 0;
+  });
+  const deptPng = await chartToPng('bar', {
+    labels: depts,
+    datasets: [{ label:'Resolution %', data: deptRes,
+      backgroundColor: depts.map(d => hexFromArr(deptColor(d))),
+      borderRadius: 6 }]
+  }, { scales:{ x:{ticks:{color:'#7d8590'},grid:{color:'#30363d'}}, y:{max:100, ticks:{color:'#7d8590',callback:v=>v+'%'}, grid:{color:'#30363d'}} }, plugins:{legend:{display:false}} });
+
+  // Place charts 2×2
+  const cW = (col - 6) / 2, cH = 52;
+  checkY(cH + 20);
+  sectionHeader('Status Breakdown');
+  doc.addImage(statusPng,'PNG', margin, y, cW, cH); 
+  doc.addImage(typePng,  'PNG', margin+cW+6, y, cW, cH);
+  y += cH + 8;
+
+  sectionHeader('Priority Distribution');
+  doc.addImage(prioPng, 'PNG', margin, y, cW, cH);
+  doc.addImage(deptPng, 'PNG', margin+cW+6, y, cW, cH);
+  y += cH + 8;
+
+  // ════════════════════════════════════════
+  // PAGE 3 — DEPARTMENT TABLE
+  // ════════════════════════════════════════
+  newPage();
+  setFont(14, 'bold'); setTxt(C.white); doc.text('Department Performance', margin, y); y += 10;
+  sectionHeader('Resolution by Department');
+
+  // Table header
+  setFill(C.surface2); doc.rect(margin, y, col, 8, 'F');
+  setFont(7, 'bold'); setTxt(C.muted);
+  const cols = [margin+2, margin+50, margin+75, margin+95, margin+115, margin+135, margin+155];
+  ['DEPARTMENT','TOTAL','BUGS','SUGG.','DOUBT','RESOLVED','PENDING'].forEach((h,i) => {
+    doc.text(h, cols[i], y+5.5);
+  });
+  y += 8;
+
+  depts.forEach((d, idx) => {
+    checkY(10);
+    const items = allFeedback.filter(f=>f.dept===d);
+    const res   = items.filter(f=>f.status==='resolved').length;
+    const pen   = items.filter(f=>f.status==='pending').length;
+    const bugsD = items.filter(f=>f.type==='bug').length;
+    const suggD = items.filter(f=>f.type==='suggestion').length;
+    const doubtD= items.filter(f=>f.type==='doubt').length;
+    const pct   = items.length ? Math.round(res/items.length*100) : 0;
+    const dc    = deptColor(d);
+
+    if (idx % 2 === 0) { setFill(C.surface); doc.rect(margin, y, col, 9, 'F'); }
+    setFill(dc); doc.rect(margin, y, 2, 9, 'F');
+    setFont(7); setTxt(C.text);
+    doc.text(d.length > 18 ? d.slice(0,17)+'…' : d, cols[0]+3, y+5.5);
+    setTxt(C.muted);
+    [items.length, bugsD, suggD, doubtD].forEach((v,i) => doc.text(String(v), cols[i+1]+6, y+5.5, {align:'right'}));
+    setTxt(C.accent);  doc.text(String(res), cols[5]+6, y+5.5, {align:'right'});
+    setTxt(C.warn);    doc.text(String(pen), cols[6]+6, y+5.5, {align:'right'});
+    y += 9;
+
+    // mini progress bar under each row
+    progressBar(margin+3, y-2, col-6, pct, dc);
+    y += 3;
+  });
+
+  if (!depts.length) {
+    setFont(9); setTxt(C.muted); doc.text('No department data yet.', margin, y+6); y += 14;
+  }
+
+  // ════════════════════════════════════════
+  // PAGE 4 — TIMELINE
+  // ════════════════════════════════════════
+  newPage();
+  setFont(14, 'bold'); setTxt(C.white); doc.text('Project Timeline', margin, y); y += 10;
+  sectionHeader('Trial & Launch Phases');
+
+  if (!allTimeline.length) {
+    setFont(9); setTxt(C.muted); doc.text('No phases recorded yet.', margin, y+6); y += 14;
+  } else {
+    allTimeline.forEach(p => {
+      checkY(22);
+      const statusColor = p.status==='done' ? C.accent : p.status==='wip' ? C.blue : C.muted;
+      const statusLabel = p.status==='done' ? 'DONE' : p.status==='wip' ? 'IN PROGRESS' : 'PLANNED';
+
+      setFill(C.surface); doc.roundedRect(margin, y, col, 18, 2, 2, 'F');
+      setFill(statusColor); doc.rect(margin, y, 3, 18, 'F');
+
+      setFont(8, 'bold'); setTxt(C.white);   doc.text(p.name, margin+7, y+6);
+      setFont(6.5);       setTxt(statusColor); doc.text('● ' + statusLabel, W-margin-2, y+6, {align:'right'});
+      setFont(6.5);       setTxt(C.muted);   doc.text(p.date, margin+7, y+11.5);
+      if (p.description) {
+        const desc = p.description.length > 90 ? p.description.slice(0,88)+'…' : p.description;
+        setFont(6.5); setTxt(C.muted); doc.text(desc, margin+7, y+16);
+      }
+      y += 22;
+    });
+  }
+
+  // ════════════════════════════════════════
+  // PAGE 5 — FULL FEEDBACK LOG
+  // ════════════════════════════════════════
+  newPage();
+  setFont(14, 'bold'); setTxt(C.white); doc.text('Full Feedback Log', margin, y); y += 10;
+  sectionHeader(`All ${allFeedback.length} Entries`);
+
+  // Table header
+  setFill(C.surface2); doc.rect(margin, y, col, 8, 'F');
+  setFont(7, 'bold'); setTxt(C.muted);
+  const fCols = [margin+2, margin+28, margin+58, margin+78, margin+98, margin+118];
+  ['DEPT','WORKER','TYPE','PRIORITY','STATUS','DESCRIPTION'].forEach((h,i) => doc.text(h, fCols[i], y+5.5));
+  y += 8;
+
+  const typeColor  = { bug:C.danger, suggestion:C.purple, doubt:C.muted };
+  const statusColor= { pending:C.warn, 'in-progress':C.blue, resolved:C.accent };
+  const prioColor  = { critical:C.danger, high:C.warn, medium:C.blue, low:C.muted };
+
+  allFeedback.forEach((f, idx) => {
+    const rowH = f.itReply ? 16 : 10;
+    checkY(rowH + 2);
+    if (idx % 2 === 0) { setFill(C.surface); doc.rect(margin, y, col, rowH, 'F'); }
+
+    const tc = typeColor[f.type]   || C.muted;
+    const sc = statusColor[f.status] || C.muted;
+    const pc = prioColor[f.priority||'medium'] || C.muted;
+
+    setFont(6.5); setTxt(C.muted);
+    doc.text((f.dept||'').slice(0,14),   fCols[0], y+5);
+    doc.text((f.workerName||'').slice(0,16), fCols[1], y+5);
+    setTxt(tc); doc.text((f.type||'').toUpperCase().slice(0,10), fCols[2], y+5);
+    setTxt(pc); doc.text((f.priority||'medium').toUpperCase().slice(0,8), fCols[3], y+5);
+    setTxt(sc); doc.text((f.status||'').toUpperCase().replace('-',' ').slice(0,10), fCols[4], y+5);
+    setTxt(C.text);
+    const desc = (f.description||'').slice(0,52) + ((f.description||'').length>52?'…':'');
+    doc.text(desc, fCols[5], y+5);
+
+    if (f.itReply) {
+      setFont(6); setTxt(C.accent);
+      const reply = '↳ IT: ' + (f.itReply||'').slice(0,80) + ((f.itReply||'').length>80?'…':'');
+      doc.text(reply, fCols[0]+3, y+11);
+    }
+    y += rowH + 2;
+  });
+
+  if (!allFeedback.length) {
+    setFont(9); setTxt(C.muted); doc.text('No feedback entries yet.', margin, y+6); y += 14;
+  }
+
+  // ════════════════════════════════════════
+  // PAGE NUMBERS on all pages
+  // ════════════════════════════════════════
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    setFont(7); setTxt(C.muted);
+    doc.text(`Page ${i} of ${totalPages}`, W-margin, H-8, { align:'right' });
+    doc.text('Trackable Solution — Ceylon Business Appliances', margin, H-8);
+  }
+
+  doc.save(`trackable-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  if (btn) { btn.disabled = false; btn.textContent = '⬇ Download report'; }
+};
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+window.copyTestLink = function(id, workerName) {
+  const base = window.location.origin + (window.location.pathname.replace('pages/dashboard.html',''));
+  const url  = `${base}pages/feedback-status.html?id=${id}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showAlert(`Test link copied for ${workerName || 'worker'}! Share it with them to confirm testing.`, 'success');
+  }).catch(() => {
+    // Fallback: show the URL in an alert
+    prompt('Copy this link and share with the worker:', url);
+  });
+};
+
+// ══════════════════════════════════════════
+// ENGAGEMENT
+// ══════════════════════════════════════════
+function dayKey(date) {
+  return date.toISOString().split('T')[0]; // "2025-05-01"
+}
+
+function lastActivityForDept(deptName) {
+  // Latest between feedback submissions and check-ins for this dept
+  const fbDates = allFeedback
+    .filter(f => f.dept === deptName && f.createdAt)
+    .map(f => f.createdAt.toDate ? f.createdAt.toDate() : new Date(f.createdAt));
+  const ciDates = allCheckins
+    .filter(c => c.dept === deptName && c.createdAt)
+    .map(c => c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt));
+  const all = [...fbDates, ...ciDates];
+  return all.length ? new Date(Math.max(...all.map(d => d.getTime()))) : null;
+}
+
+function daysAgo(date) {
+  if (!date) return null;
+  return Math.floor((Date.now() - date.getTime()) / 86400000);
+}
+
+function renderEngagement() {
+  const today    = dayKey(new Date());
+  const weekAgo  = new Date(Date.now() - 7 * 86400000);
+
+  // Per-dept last activity
+  const deptNames = allDepts.map(d => d.name);
+
+  const activeToday  = deptNames.filter(d => { const la = lastActivityForDept(d); return la && dayKey(la) === today; }).length;
+  const activeWeek   = deptNames.filter(d => { const la = lastActivityForDept(d); return la && la >= weekAgo; }).length;
+  const inactive7    = deptNames.filter(d => { const la = lastActivityForDept(d); return !la || daysAgo(la) >= 7; }).length;
+
+  document.getElementById('eng-today').textContent    = `${activeToday}/${deptNames.length}`;
+  document.getElementById('eng-week').textContent     = `${activeWeek}/${deptNames.length}`;
+  document.getElementById('eng-inactive').textContent = inactive7;
+  document.getElementById('eng-checkins').textContent = allCheckins.length;
+
+  // Dept activity list
+  const listEl = document.getElementById('eng-dept-list');
+  if (!deptNames.length) {
+    listEl.innerHTML = '<div class="empty-state"><p>No departments yet</p></div>';
+  } else {
+    listEl.innerHTML = deptNames.map(d => {
+      const last = lastActivityForDept(d);
+      const days = daysAgo(last);
+      const isToday = last && dayKey(last) === today;
+      const color   = !last ? 'var(--muted)' : days === 0 ? 'var(--accent)' : days < 3 ? 'var(--accent2)' : days < 7 ? 'var(--warn)' : 'var(--danger)';
+      const label   = !last ? 'No activity yet' : days === 0 ? 'Active today' : days === 1 ? 'Yesterday' : `${days} days ago`;
+      const dot     = !last ? '○' : days === 0 ? '●' : days < 7 ? '◉' : '⊘';
+      const fbCount = allFeedback.filter(f => f.dept === d).length;
+      const ciCount = allCheckins.filter(c => c.dept === d).length;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px;color:${color};flex-shrink:0">${dot}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500">${d}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px">${fbCount} feedback · ${ciCount} check-ins</div>
+        </div>
+        <span style="font-size:11px;font-weight:600;color:${color};white-space:nowrap">${label}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // 14-day heatmap
+  const heatEl = document.getElementById('eng-heatmap');
+  const days14 = Array.from({length:14}, (_,i) => {
+    const d = new Date(Date.now() - (13-i) * 86400000);
+    return dayKey(d);
+  });
+  heatEl.innerHTML = days14.map(dk => {
+    const count = allFeedback.filter(f => {
+      if (!f.createdAt) return false;
+      const d = f.createdAt.toDate ? f.createdAt.toDate() : new Date(f.createdAt);
+      return dayKey(d) === dk;
+    }).length + allCheckins.filter(c => {
+      if (!c.createdAt) return false;
+      const d = c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
+      return dayKey(d) === dk;
+    }).length;
+    const bg = count === 0 ? 'var(--surface2);border:1px solid var(--border)'
+             : count < 3  ? 'rgba(46,168,79,0.25)'
+             : count < 6  ? 'rgba(46,168,79,0.55)'
+             : 'var(--accent)';
+    const shortDate = new Date(dk).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return `<div title="${shortDate}: ${count} activities" style="aspect-ratio:1;border-radius:3px;background:${bg};cursor:default"></div>`;
+  }).join('');
+
+  // Inactive alerts
+  const inactive = deptNames.filter(d => { const la = lastActivityForDept(d); return !la || daysAgo(la) >= 7; });
+  const alertCard = document.getElementById('eng-alerts-card');
+  const alertList = document.getElementById('eng-alerts-list');
+  if (inactive.length) {
+    alertCard.style.display = 'block';
+    alertList.innerHTML = inactive.map(d => {
+      const last = lastActivityForDept(d);
+      const days = daysAgo(last);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.15);border-radius:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:500">${d}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${!last ? 'Never submitted anything' : `Last activity: ${days} days ago`}</div>
+        </div>
+        <button class="btn btn-sm" style="font-size:11px;color:var(--danger);border:1px solid rgba(248,81,73,0.3)" onclick="copyCheckinLink('${d}')">Send check-in link</button>
+      </div>`;
+    }).join('');
+  } else {
+    alertCard.style.display = 'none';
+  }
+}
+
+window.renderCheckinLog = function() {
+  const el    = document.getElementById('eng-checkin-log');
+  const filter = document.getElementById('checkin-dept-filter')?.value || '';
+  const list  = filter ? allCheckins.filter(c => c.dept === filter) : allCheckins;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><p>No check-ins yet</p></div>';
+    return;
+  }
+  el.innerHTML = list.slice(0, 50).map(c => {
+    const d = c.createdAt?.toDate ? c.createdAt.toDate() : c.createdAt ? new Date(c.createdAt) : null;
+    const timeStr = d ? d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px"></div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:500">${c.dept || '—'}</span>
+          <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted)">${c.submittedBy || 'Worker'}</span>
+          <span style="font-size:11px;color:var(--muted)">${timeStr}</span>
+        </div>
+        ${c.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${c.note}"</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.copyCheckinLink = function(deptHint = '') {
+  const base = window.location.origin + window.location.pathname.replace('pages/dashboard.html','');
+  const url  = `${base}pages/check-in.html${deptHint ? '?dept='+encodeURIComponent(deptHint) : ''}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showAlert('Check-in link copied! Share it with the department workers.', 'success');
+  }).catch(() => { prompt('Copy this link and share with workers:', url); });
 };
 
 window.doSignOut = async () => { await signOut(auth); window.location.href = '../index.html'; };
@@ -712,8 +1275,9 @@ window.showSection = function(sec, el) {
   document.getElementById('sec-' + sec).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  const titles = { overview:'Overview', feedback:'Feedback Log', departments:'Departments', timeline:'Timeline', users:'Manage Users' };
+  const titles = { overview:'Overview', feedback:'Feedback Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline', users:'Manage Users' };
   document.getElementById('page-title').textContent = titles[sec] || sec;
+  if (sec === 'engagement') { renderEngagement(); renderCheckinLog(); }
 };
 
 window.setStatusFilter = function(val, el) {
