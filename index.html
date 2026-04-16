@@ -239,64 +239,104 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // ── Role tab state (module-scoped, exposed via window for onclick) ──
+  let currentRole = 'coordinator';
+  window.setRole = function(role, el) {
+    currentRole = role;
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    // Clear any lingering error when user switches tabs
+    document.getElementById('err').style.display = 'none';
+  };
+
   // Auto-redirect if already logged in
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      const snap = await getDoc(doc(db, 'users', user.uid));
-      if (!snap.exists()) {
-        // Auth record exists but no Firestore doc — sign out and stop
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (!snap.exists()) {
+          // Auth record exists but no Firestore doc — sign out and stop
+          await signOut(auth);
+          return;
+        }
+        redirectByRole(snap.data().role);
+      } catch (e) {
+        // Firestore unavailable — sign out to avoid stuck state
         await signOut(auth);
-        return;
       }
-      const role = snap.data().role;
-      redirectByRole(role);
     }
   });
 
   window.doLogin = async function() {
-    const email = document.getElementById('email').value.trim();
+    const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
-    const errEl = document.getElementById('err');
-    const spinner = document.getElementById('loading-spinner');
-    errEl.style.display = 'none';
+    const spinner  = document.getElementById('loading-spinner');
+    const loginBtn = document.querySelector('.btn-login');
+
+    document.getElementById('err').style.display = 'none';
+
     if (!email || !password) { showErr('Please enter your email and password.'); return; }
-    document.querySelector('.btn-login').classList.add('loading');
+
+    // Basic client-side email format check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showErr('Please enter a valid email address.');
+      return;
+    }
+
+    loginBtn.classList.add('loading');
     spinner.style.display = 'block';
+
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      const snap = await getDoc(doc(db, 'users', cred.user.uid));
+      let snap;
+      try {
+        snap = await getDoc(doc(db, 'users', cred.user.uid));
+      } catch (firestoreErr) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        loginBtn.classList.remove('loading');
+        showErr('Unable to verify account. Check your connection and try again.');
+        return;
+      }
 
-      // ✅ KEY FIX: If no Firestore doc exists, reject the login
+      // If no Firestore doc exists, reject the login
       if (!snap.exists()) {
         await signOut(auth);
         spinner.style.display = 'none';
-        document.querySelector('.btn-login').classList.remove('loading');
+        loginBtn.classList.remove('loading');
         showErr('Account not recognized. Contact your coordinator for access.');
         return;
       }
 
       const role = snap.data().role;
 
-    // ✅ Map tab selection to allowed roles
-    const roleTabMap = {
-      coordinator: ['coordinator'],
-      developer:   ['developer', 'it', 'it_developer'],
-      management:  ['management']
-    };
+      // Map tab selection to allowed roles
+      const roleTabMap = {
+        coordinator: ['coordinator'],
+        developer:   ['developer', 'it', 'it_developer'],
+        management:  ['management']
+      };
 
-    if (!roleTabMap[currentRole].includes(role)) {
-      await signOut(auth);
-      spinner.style.display = 'none';
-      document.querySelector('.btn-login').classList.remove('loading');
-      showErr('This account does not have access to the selected role tab.');
-      return;
-    }
+      if (!roleTabMap[currentRole].includes(role)) {
+        await signOut(auth);
+        spinner.style.display = 'none';
+        loginBtn.classList.remove('loading');
+        showErr('This account does not have access to the selected role tab.');
+        return;
+      }
 
-    redirectByRole(role);
+      redirectByRole(role);
     } catch(e) {
       spinner.style.display = 'none';
-      document.querySelector('.btn-login').classList.remove('loading');
-      showErr('Invalid email or password. Please try again.');
+      loginBtn.classList.remove('loading');
+      // Surface friendlier messages for common Firebase auth error codes
+      if (e.code === 'auth/too-many-requests') {
+        showErr('Too many failed attempts. Please wait a moment before trying again.');
+      } else if (e.code === 'auth/network-request-failed') {
+        showErr('Network error. Check your connection and try again.');
+      } else {
+        showErr('Invalid email or password. Please try again.');
+      }
     }
   };
 
@@ -312,15 +352,12 @@
     else window.location.href = 'pages/dashboard.html';
   }
 
-  // Allow Enter key to submit
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin(); });
-
-let currentRole = 'coordinator';
-window.setRole = function(role, el) {
-  currentRole = role;
-  document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-};
+  // Allow Enter key to submit — only when focus is on an input field
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target === document.body)) {
+      window.doLogin();
+    }
+  });
 </script>
 </body>
 </html>
