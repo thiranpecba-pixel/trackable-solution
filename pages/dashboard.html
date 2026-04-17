@@ -52,6 +52,35 @@
 
       <!-- ══ OVERVIEW ══ -->
       <div id="sec-overview" class="section-panel">
+
+        <!-- ── Today's Check-in Alert Panel ── -->
+        <div id="checkin-alert-panel" style="display:none;margin-bottom:16px">
+          <div style="background:rgba(248,81,73,0.07);border:1px solid rgba(248,81,73,0.28);border-radius:12px;padding:16px 18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:20px">🔔</span>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:var(--danger)" id="checkin-alert-title">Departments not checked in today</div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:2px" id="checkin-alert-sub">Follow up with these departments</div>
+                </div>
+              </div>
+              <button class="btn btn-sm" style="font-size:12px;color:var(--muted);border:1px solid var(--border)" onclick="document.getElementById('checkin-alert-panel').style.display='none'">Dismiss</button>
+            </div>
+            <div id="checkin-alert-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+        </div>
+
+        <!-- ── All checked in banner ── -->
+        <div id="checkin-all-good" style="display:none;margin-bottom:16px">
+          <div style="background:rgba(46,168,79,0.07);border:1px solid rgba(46,168,79,0.25);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:20px">✅</span>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:var(--accent)">All departments checked in today!</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">Great engagement — every department is active today.</div>
+            </div>
+          </div>
+        </div>
+
         <div class="metric-grid" id="metric-grid">
           <div class="metric-card"><div class="metric-label">Total entries</div><div class="metric-value" id="m-total">—</div><div class="metric-sub">All feedback</div></div>
           <div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value" style="color:var(--warn)" id="m-pending">—</div><div class="metric-sub">Awaiting IT</div></div>
@@ -1376,6 +1405,9 @@ function renderEngagement() {
     return `<div title="${shortDate}: ${count} activities" style="aspect-ratio:1;border-radius:3px;background:${bg};cursor:default"></div>`;
   }).join('');
 
+  // Today's check-in alert panel on overview
+  renderCheckinAlertPanel();
+
   // Inactive alerts
   const inactive = deptNames.filter(d => { const la = lastActivityForDept(d); return !la || daysAgo(la) >= 7; });
   const alertCard = document.getElementById('eng-alerts-card');
@@ -1395,6 +1427,45 @@ function renderEngagement() {
     }).join('');
   } else {
     alertCard.style.display = 'none';
+  }
+}
+
+// ── Today's check-in alert panel (Overview section) ──
+function renderCheckinAlertPanel() {
+  const today = dayKey(new Date());
+  const deptNames = allDepts.map(d => d.name);
+  if (!deptNames.length) return;
+
+  // Departments that have NOT had any check-in today
+  const notCheckedIn = deptNames.filter(d => {
+    return !allCheckins.some(c => {
+      if (c.dept !== d || !c.createdAt) return false;
+      const dt = c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
+      return dayKey(dt) === today;
+    });
+  });
+
+  const panel    = document.getElementById('checkin-alert-panel');
+  const allGood  = document.getElementById('checkin-all-good');
+  const listEl   = document.getElementById('checkin-alert-list');
+  const titleEl  = document.getElementById('checkin-alert-title');
+  const subEl    = document.getElementById('checkin-alert-sub');
+
+  if (notCheckedIn.length === 0) {
+    panel.style.display   = 'none';
+    allGood.style.display = 'block';
+  } else {
+    allGood.style.display = 'none';
+    panel.style.display   = 'block';
+    const n = notCheckedIn.length;
+    const total = deptNames.length;
+    titleEl.textContent = `${n} of ${total} department${n > 1 ? 's have' : ' has'} not checked in today`;
+    subEl.textContent   = `Send them the check-in link as a reminder`;
+    listEl.innerHTML = notCheckedIn.map(d => `
+      <div style="display:flex;align-items:center;gap:8px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.18);border-radius:8px;padding:8px 12px">
+        <span style="font-size:13px;font-weight:500;color:var(--text)">${d}</span>
+        <button class="btn btn-sm" style="font-size:11px;color:var(--accent2);border:1px solid rgba(56,139,253,0.3);padding:2px 9px;margin-left:4px" onclick="copyCheckinLink('${d.replace(/'/g,"\\'")}')">🔗 Send link</button>
+      </div>`).join('');
   }
 }
 
