@@ -844,71 +844,77 @@ window.doSignOut = async () => { await signOut(auth); window.location.href = '..
 
 <!-- ── LIGHT / DARK MODE ── -->
 <style>
-/* ── Dark mode (default) — matches existing main.css dark palette ── */
-:root {
-  --bg:       #0d1117;
-  --surface:  #161b22;
-  --surface2: #1c2128;
-  --border:   #30363d;
-  --text:     #e6edf3;
-  --muted:    #7d8590;
-  --accent:   #2ea84f;
-  --accent2:  #388bfd;
-  --warn:     #d29922;
-  --danger:   #f85149;
-  --purple:   #bc8cff;
-  --blue:     #388bfd;
-  --sidebar-bg:     #0d1117;
-  --topbar-bg:      rgba(13,17,23,0.92);
-  --card-bg:        #161b22;
-  --input-bg:       #0d1117;
-  --scrollbar-thumb:#30363d;
+/* ── Light mode: fill ALL variables that main.css doesn't cover ──
+   main.css body.light only sets --bg/surface/surface2/surface3/border/border2/text/muted
+   We patch the rest here so accent-dim, warn-dim, danger-dim, purple-dim, muted2, etc.
+   all become light-appropriate values.                                         */
+body.light {
+  /* Accent / status colours — slightly deeper for legibility on white */
+  --accent:       #1a7f37;
+  --accent-dim:   rgba(26,127,55,0.1);
+  --accent2:      #0969da;
+  --accent2-dim:  rgba(9,105,218,0.1);
+  --warn:         #9a6700;
+  --warn-dim:     rgba(154,103,0,0.1);
+  --danger:       #cf222e;
+  --danger-dim:   rgba(207,34,46,0.1);
+  --purple:       #8250df;
+  --purple-dim:   rgba(130,80,223,0.1);
+
+  /* Surface / border extras not in main.css body.light block */
+  --muted2:       #8c959f;
+
+  /* Timeline dot border needs to match light bg */
+  --bg: #f6f8fa;
 }
 
-/* ── Light mode overrides ── */
-html[data-theme="light"] {
-  --bg:       #f6f8fa;
-  --surface:  #ffffff;
-  --surface2: #eaeef2;
-  --border:   #d0d7de;
-  --text:     #1f2328;
-  --muted:    #636c76;
-  --accent:   #1a7f37;
-  --accent2:  #0969da;
-  --warn:     #9a6700;
-  --danger:   #cf222e;
-  --purple:   #8250df;
-  --blue:     #0969da;
-  --sidebar-bg:     #f6f8fa;
-  --topbar-bg:      rgba(246,248,250,0.92);
-  --card-bg:        #ffffff;
-  --input-bg:       #f6f8fa;
-  --scrollbar-thumb:#d0d7de;
+/* ── Structural fixes: elements that use hard-coded dark hex in main.css ── */
+
+/* Nav active state — accent-dim bg is now correct in light */
+body.light .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+
+/* Progress bar track */
+body.light .progress-bar { background: var(--surface3); }
+
+/* Timeline line */
+body.light .timeline::before { background: var(--border); }
+
+/* Timeline dot border uses --bg to cut out, must be light bg */
+body.light .tl-dot { border-color: var(--bg); }
+body.light .tl-dot.plan { background: var(--surface3); border-color: var(--border2); }
+
+/* Filter chips — active state */
+body.light .filter-chip.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+/* Scrollbar */
+body.light ::-webkit-scrollbar-thumb { background: var(--surface3); }
+
+/* Inline border-bottom rows in engagement/checkin lists */
+body.light [style*="border-bottom:1px solid var(--border)"] { border-color: var(--border) !important; }
+
+/* Inactive dept alert cards — softer red tint on white */
+body.light [style*="rgba(248,81,73,0.06)"] {
+  background: rgba(207,34,46,0.05) !important;
+  border-color: rgba(207,34,46,0.2) !important;
 }
 
-/* Apply CSS variables to base elements (so external main.css var() calls auto-update) */
-html[data-theme="light"] body           { background: var(--bg); color: var(--text); }
-html[data-theme="light"] .sidebar       { background: var(--sidebar-bg); border-color: var(--border); }
-html[data-theme="light"] .topbar        { background: var(--topbar-bg); border-color: var(--border); }
-html[data-theme="light"] .card,
-html[data-theme="light"] .metric-card,
-html[data-theme="light"] .dept-card     { background: var(--card-bg); border-color: var(--border); }
-html[data-theme="light"] .nav-item      { color: var(--muted); }
-html[data-theme="light"] .nav-item:hover,
-html[data-theme="light"] .nav-item.active { background: var(--surface2); color: var(--text); }
-html[data-theme="light"] .sidebar-footer { border-color: var(--border); }
-html[data-theme="light"] .progress-bar  { background: var(--surface2); }
-html[data-theme="light"] .filter-chip   { background: var(--surface2); color: var(--muted); border-color: var(--border); }
-html[data-theme="light"] .filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-html[data-theme="light"] .btn           { background: var(--surface2); color: var(--text); border-color: var(--border); }
-html[data-theme="light"] .btn:hover     { background: var(--border); }
-html[data-theme="light"] .tl-item .tl-body { border-color: var(--border); }
-html[data-theme="light"] .badge         { opacity: 0.9; }
-html[data-theme="light"] select,
-html[data-theme="light"] input,
-html[data-theme="light"] textarea       { background: var(--input-bg); color: var(--text); border-color: var(--border); }
+/* User avatar border/colour inherits --accent2 — fine, no override needed */
 
-/* Theme toggle button */
+/* Form inputs: surface2 bg already picks up the light value */
+body.light .form-input,
+body.light .form-select,
+body.light .form-textarea,
+body.light .search-input { background: var(--surface2); color: var(--text); border-color: var(--border); }
+
+/* Modal backdrop slightly lighter */
+body.light .modal-overlay { background: rgba(0,0,0,0.35); }
+body.light .modal { background: var(--surface); border-color: var(--border2); }
+
+/* Topbar & sidebar already handled by main.css body.light, but add box-shadow for depth */
+body.light .topbar  { box-shadow: 0 1px 0 var(--border); background: #ffffff; }
+body.light .sidebar { box-shadow: 1px 0 0 var(--border); background: #ffffff; }
+
+/* ── Theme toggle button ── */
 .btn-theme-toggle {
   font-size: 16px !important;
   padding: 0 10px !important;
@@ -919,23 +925,21 @@ html[data-theme="light"] textarea       { background: var(--input-bg); color: va
 
 <script>
 (function() {
-  // Persist preference in localStorage
   const saved = localStorage.getItem('resolveiq-theme') || 'dark';
   applyTheme(saved);
 
   function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.body.classList.toggle('light', theme === 'light');
     const icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = theme === 'light' ? '🌙' : '☀';
     localStorage.setItem('resolveiq-theme', theme);
   }
 
   window.toggleTheme = function() {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
-    applyTheme(current === 'dark' ? 'light' : 'dark');
+    const isLight = document.body.classList.contains('light');
+    applyTheme(isLight ? 'dark' : 'light');
   };
 
-  // Re-apply once DOM is ready (in case icon wasn't available yet above)
   document.addEventListener('DOMContentLoaded', () => applyTheme(saved));
 })();
 </script>
