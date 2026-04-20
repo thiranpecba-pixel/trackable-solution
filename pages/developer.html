@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IT Developer — Trackable Solution</title>
+<link rel="stylesheet" href="../css/main.css"/>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">TS</div>
+      <div><div class="logo-label">Trackable Solution</div><div class="logo-sub">IT Developer View</div></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Queue</div>
+      <button class="nav-item active" onclick="showSection('pending',this)"><span class="icon">⊡</span> Pending <span id="pending-count" style="margin-left:auto;background:var(--warn);color:#000;font-size:10px;padding:1px 6px;border-radius:99px"></span></button>
+      <button class="nav-item" onclick="showSection('inprogress',this)"><span class="icon">◎</span> In progress</button>
+      <button class="nav-item" onclick="showSection('resolved',this)"><span class="icon">✓</span> Resolved</button>
+      <button class="nav-item" onclick="showSection('all',this)"><span class="icon">▦</span> All feedback</button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sb-avatar" style="border-color:var(--accent2);color:var(--accent2)">?</div>
+        <div><div class="user-name" id="sb-name">Loading…</div><div class="user-role">IT Developer</div></div>
+      </div>
+      <button class="btn-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Pending feedback</div>
+        <div class="page-breadcrumb">Review and respond to worker feedback</div>
+      </div>
+      <div class="topbar-right">
+        <div class="metric-card" style="padding:8px 16px;border-radius:8px;display:flex;gap:16px">
+          <div><div class="metric-label" style="font-size:10px">Pending</div><div style="font-size:18px;font-weight:600;color:var(--warn);font-family:'DM Mono',monospace" id="t-pending">0</div></div>
+          <div><div class="metric-label" style="font-size:10px">In progress</div><div style="font-size:18px;font-weight:600;color:var(--accent2);font-family:'DM Mono',monospace" id="t-prog">0</div></div>
+          <div><div class="metric-label" style="font-size:10px">Resolved</div><div style="font-size:18px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace" id="t-done">0</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div id="alert-area"></div>
+      <div class="toolbar">
+        <input class="search-input" placeholder="Search by description, department, worker…" oninput="filterFeedback(this.value)">
+        <select class="form-select" style="width:auto" id="dept-filter" onchange="filterFeedback()">
+          <option value="">All departments</option>
+        </select>
+        <select class="form-select" style="width:auto" id="type-filter" onchange="filterFeedback()">
+          <option value="">All types</option>
+          <option value="bug">Bugs</option>
+          <option value="suggestion">Suggestions</option>
+          <option value="doubt">Doubts</option>
+        </select>
+      </div>
+      <div id="feedback-container"></div>
+    </div>
+  </main>
+</div>
+
+<!-- REPLY MODAL -->
+<div class="modal-overlay" id="reply-modal">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Respond to feedback</h3><button class="modal-close" onclick="closeReplyModal()">×</button></div>
+    <div id="modal-feedback-detail" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:20px"></div>
+    <div class="form-group">
+      <label class="form-label">Your reply / solution</label>
+      <textarea class="form-textarea" id="reply-text" rows="5" placeholder="Describe the solution, answer, or reason. This will be visible to the coordinator…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Update status</label>
+      <select class="form-select" id="reply-status">
+        <option value="in-progress">In progress (still working)</option>
+        <option value="resolved">Resolved (completed)</option>
+      </select>
+    </div>
+    <div id="modal-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeReplyModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReply()">Submit reply</button>
+    </div>
+  </div>
+</div>
+
+<!-- THREAD MODAL (Developer) -->
+<div class="modal-overlay" id="dev-thread-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-hdr"><h3>💬 Discussion thread</h3><button class="modal-close" onclick="closeDevThread()">×</button></div>
+    <div id="dev-thread-detail" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px"></div>
+    <div id="dev-thread-messages" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-right:4px"></div>
+    <div class="form-group" style="margin:0">
+      <textarea class="form-textarea" id="dev-thread-input" rows="3" placeholder="Reply to coordinator or add an update…"></textarea>
+    </div>
+    <div id="dev-thread-alert"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDevThread()">Close</button>
+      <button class="btn btn-primary" onclick="postDevMessage()">Send message</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+  authDomain: "trackable-progress.firebaseapp.com",
+  projectId: "trackable-progress",
+  storageBucket: "trackable-progress.firebasestorage.app",
+  messagingSenderId: "961877401670",
+  appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+};
+
+const FEEDBACK_TYPES = {
+  doubt:      { label: 'Doubt',      color: 'badge-doubt'      },
+  suggestion: { label: 'Suggestion', color: 'badge-suggestion' },
+  bug:        { label: 'Bug',        color: 'badge-bug'        }
+};
+
+const STATUS = {
+  pending:       { label: 'Pending',     color: 'badge-pending'  },
+  'in-progress': { label: 'In progress', color: 'badge-progress' },
+  resolved:      { label: 'Resolved',    color: 'badge-resolved' }
+};
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function badge(type, map) {
+  const item = map[type] || { label: type, color: 'badge-doubt' };
+  return `<span class="badge ${item.color}">${item.label}</span>`;
+}
+
+function initials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null, allFeedback = [], currentSection = 'pending', searchVal = '', selectedId = null;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = '../portal.html'; return; }
+  const snap = await getDoc(doc(db, 'users', user.uid));
+  const role = snap.data()?.role;
+  if (!snap.exists() || !['developer', 'it', 'it_developer'].includes(role)) { window.location.href = '../portal.html'; return; }
+  currentUser = { uid: user.uid, ...snap.data() };
+  document.getElementById('sb-name').textContent = currentUser.name || user.email;
+  document.getElementById('sb-avatar').textContent = initials(currentUser.name || user.email);
+
+  // Load departments from Firestore into filter dropdown
+  onSnapshot(collection(db, 'departments'), snap => {
+    const depts = snap.docs.map(d => d.data().name);
+    const filter = document.getElementById('dept-filter');
+    filter.innerHTML = '<option value="">All departments</option>' +
+      depts.map(d => `<option value="${d}">${d}</option>`).join('');
+  });
+  onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')), snap => {
+    allFeedback = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateCounters();
+    renderFeedback();
+  });
+});
+
+function updateCounters() {
+  const pend = allFeedback.filter(f => f.status === 'pending').length;
+  document.getElementById('t-pending').textContent = pend;
+  document.getElementById('t-prog').textContent = allFeedback.filter(f => f.status === 'in-progress').length;
+  document.getElementById('t-done').textContent = allFeedback.filter(f => f.status === 'resolved').length;
+  document.getElementById('pending-count').textContent = pend || '';
+}
+
+function renderFeedback() {
+  const search = (document.getElementById('search-input') ? document.getElementById('search-input')?.value : searchVal || '').toLowerCase();
+  const dept = document.getElementById('dept-filter')?.value || '';
+  const type = document.getElementById('type-filter')?.value || '';
+  let list = allFeedback.filter(f => {
+    const matchSec = currentSection === 'all' || f.status === { pending: 'pending', inprogress: 'in-progress', resolved: 'resolved' }[currentSection];
+    const matchDept = !dept || f.dept === dept;
+    const matchType = !type || f.type === type;
+    const matchSearch = !search || (f.description||'').toLowerCase().includes(search) || (f.dept||'').toLowerCase().includes(search) || (f.workerName||'').toLowerCase().includes(search);
+    return matchSec && matchDept && matchType && matchSearch;
+  });
+
+  const el = document.getElementById('feedback-container');
+  if (!list.length) {
+    el.innerHTML = '<div class="card"><div class="empty-state"><div class="icon">✓</div><p>No items here</p></div></div>';
+    return;
+  }
+  el.innerHTML = list.map(f => `
+    <div class="card mb-16">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:4px;align-self:stretch;border-radius:99px;background:${f.priority==='critical'?'var(--danger)':f.priority==='high'?'var(--warn)':f.priority==='medium'?'var(--accent2)':'var(--border2)'}"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
+            <div>
+              <div style="font-size:15px;font-weight:500;margin-bottom:6px">${f.description || ''}</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface3);color:var(--muted)">${f.dept}</span>
+                ${badge(f.type, FEEDBACK_TYPES)}
+                ${badge(f.status, STATUS)}
+                <span class="badge" style="background:var(--surface3);color:${f.priority==='critical'?'var(--danger)':f.priority==='high'?'var(--warn)':'var(--muted)'}">${(f.priority||'medium').toUpperCase()}</span>
+                <span class="text-sm text-muted">👤 ${f.workerName}</span>
+                <span class="text-sm text-muted">📅 ${formatDate(f.createdAt)}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" style="background:rgba(248,81,73,0.12);color:var(--danger);border:1px solid rgba(248,81,73,0.3)" onclick="deleteFeedback('${f.id}')">Delete</button>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-primary btn-sm" onclick="openReplyModal('${f.id}')">Reply</button>
+              <button class="btn btn-sm" style="border:1px solid rgba(46,168,79,0.3);color:var(--accent)" onclick="openDevThread('${f.id}')">💬${f.threadCount ? ` ${f.threadCount}` : ''}</button>
+            </div>
+          </div>
+          ${f.itReply
+            ? `<div class="it-reply"><div class="it-reply-label">Your reply</div><div class="it-reply-text">${f.itReply}</div>
+               <div style="margin-top:10px">
+                 ${f.workerTestStatus === 'confirmed'
+                   ? `<span style="font-size:12px;font-weight:600;color:var(--accent);background:rgba(46,168,79,0.1);border:1px solid rgba(46,168,79,0.25);padding:3px 10px;border-radius:99px">✓ Worker confirmed — fix is working</span>`
+                   : f.workerTestStatus === 'rejected'
+                   ? `<div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);border-radius:8px;padding:10px;margin-top:4px">
+                        <div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:4px">✕ Worker says it's still not working</div>
+                        ${f.workerRejectNote ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">"${f.workerRejectNote}"</div>` : ''}
+                        <div style="font-size:11px;color:var(--danger);margin-top:6px">⚠ This item has been re-opened — please investigate and reply again.</div>
+                      </div>`
+                   : `<span style="font-size:12px;color:var(--warn);background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.25);padding:3px 10px;border-radius:99px">⏳ Waiting for worker to confirm they tested</span>`}
+               </div></div>`
+            : '<div class="awaiting-reply">No reply yet — click Reply to respond</div>'}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+window.filterFeedback = function(val) {
+  if (val !== undefined) searchVal = val;
+  renderFeedback();
+};
+
+window.showSection = function(sec, el) {
+  currentSection = sec;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  const titles = { pending:'Pending feedback', inprogress:'In progress', resolved:'Resolved', all:'All feedback' };
+  document.getElementById('page-title').textContent = titles[sec];
+  renderFeedback();
+};
+
+window.openReplyModal = function(id) {
+  selectedId = id;
+  const f = allFeedback.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('modal-feedback-detail').innerHTML = `
+    <div style="font-size:14px;font-weight:500;margin-bottom:8px">${f.description}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;background:var(--surface3);color:var(--muted);padding:1px 7px;border-radius:99px">${f.dept}</span>
+      ${badge(f.type, FEEDBACK_TYPES)} — ${f.workerName} · ${formatDate(f.createdAt)}
+    </div>`;
+  document.getElementById('reply-text').value = f.itReply || '';
+  document.getElementById('reply-modal').classList.add('open');
+};
+
+window.closeReplyModal = () => {
+  document.getElementById('reply-modal').classList.remove('open');
+  selectedId = null;
+};
+
+window.submitReply = async function() {
+  const reply = document.getElementById('reply-text').value.trim();
+  const status = document.getElementById('reply-status').value;
+  if (!reply) { document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">Please write a reply.</div>'; return; }
+  await updateDoc(doc(db, 'feedback', selectedId), { itReply: reply, status, updatedAt: serverTimestamp(), repliedBy: currentUser.uid, repliedAt: serverTimestamp() });
+  closeReplyModal();
+  showAlert('Reply submitted!', 'success');
+};
+
+window.deleteFeedback = async function(id) {
+  if (!confirm('Delete this feedback entry? This cannot be undone.')) return;
+  try {
+    await deleteDoc(doc(db, 'feedback', id));
+    showAlert('Feedback deleted.', 'success');
+  } catch(e) {
+    showAlert('Failed to delete. Please try again.', 'danger');
+  }
+};
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alert-area');
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => el.innerHTML = '', 4000);
+}
+
+let devThreadId = null, devThreadUnsub = null;
+
+window.openDevThread = function(id) {
+  devThreadId = id;
+  const f = allFeedback.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('dev-thread-detail').innerHTML = `
+    <div style="font-size:13px;font-weight:500;margin-bottom:6px">${f.description}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;background:var(--surface3);color:var(--muted);padding:1px 7px;border-radius:99px">${f.dept}</span>
+      ${badge(f.type, FEEDBACK_TYPES)} — ${f.workerName}
+    </div>`;
+  document.getElementById('dev-thread-input').value = '';
+  document.getElementById('dev-thread-alert').innerHTML = '';
+  document.getElementById('dev-thread-modal').classList.add('open');
+
+  if (devThreadUnsub) devThreadUnsub();
+  devThreadUnsub = onSnapshot(
+    query(collection(db, 'feedback', id, 'thread'), orderBy('createdAt', 'asc')),
+    snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const el = document.getElementById('dev-thread-messages');
+      if (!msgs.length) {
+        el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = msgs.map(m => {
+        const isCoord = m.role === 'coordinator';
+        return `<div style="display:flex;flex-direction:column;align-items:${isCoord ? 'flex-start' : 'flex-end'}">
+          <div style="max-width:80%;background:${isCoord ? 'rgba(46,168,79,0.1)' : 'rgba(56,139,253,0.12)'};border:1px solid ${isCoord ? 'rgba(46,168,79,0.2)' : 'rgba(56,139,253,0.25)'};border-radius:10px;padding:10px 14px">
+            <div style="font-size:11px;font-weight:600;color:${isCoord ? 'var(--accent)' : 'var(--accent2)'};margin-bottom:4px">${m.senderName} · ${isCoord ? 'Coordinator' : 'IT Developer'}</div>
+            <div style="font-size:13px;line-height:1.5">${m.text}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:right">${formatDate(m.createdAt)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+  );
+};
+
+window.closeDevThread = function() {
+  document.getElementById('dev-thread-modal').classList.remove('open');
+  if (devThreadUnsub) { devThreadUnsub(); devThreadUnsub = null; }
+  devThreadId = null;
+};
+
+window.postDevMessage = async function() {
+  const text = document.getElementById('dev-thread-input').value.trim();
+  if (!text) { document.getElementById('dev-thread-alert').innerHTML = '<div class="alert alert-danger">Please write a message.</div>'; return; }
+  await addDoc(collection(db, 'feedback', devThreadId, 'thread'), {
+    text, senderName: currentUser.name || 'IT Developer',
+    senderId: currentUser.uid, role: 'developer',
+    createdAt: serverTimestamp()
+  });
+  const msgs = await getDocs(collection(db, 'feedback', devThreadId, 'thread'));
+  await updateDoc(doc(db, 'feedback', devThreadId), { threadCount: msgs.size });
+  document.getElementById('dev-thread-input').value = '';
+};
+
+window.doSignOut = async () => { await signOut(auth); window.location.href = '../portal.html'; };
+
+// expose search input reference
+window.document.addEventListener('DOMContentLoaded', () => {
+  window.document.querySelector('.search-input')?.setAttribute('id','search-input');
+});
+</script>
+</body>
+</html>

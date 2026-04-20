@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Submit Feedback — CBA ResolveIQ</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;
+    --accent:#2ea84f;--accent2:#388bfd;--text:#e6edf3;--muted:#7d8590;
+    --danger:#f85149;--warn:#d29922;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 50%,rgba(46,168,79,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 30%,rgba(56,139,253,0.05) 0%,transparent 60%);pointer-events:none}
+  .wrap{width:100%;max-width:520px;position:relative;z-index:1}
+  .logo-area{text-align:center;margin-bottom:32px}
+  .logo-badge{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 18px;margin-bottom:16px}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#238636);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-family:'DM Mono',monospace;font-weight:500;color:#fff}
+  .logo-text{font-size:14px;font-weight:500}
+  h1{font-size:24px;font-weight:600;letter-spacing:-0.5px;margin-bottom:6px}
+  .subtitle{font-size:14px;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+  .form-group{margin-bottom:16px}
+  .form-label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px}
+  .form-input,.form-select,.form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.15s}
+  .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent2)}
+  .form-select{appearance:none;cursor:pointer}
+  .form-textarea{resize:vertical;min-height:100px}
+  .btn-submit{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+  .btn-submit:hover{opacity:0.88}
+  .btn-submit:disabled{opacity:0.5;cursor:not-allowed}
+  .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-top:14px}
+  .alert-danger{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger)}
+  .alert-success{background:rgba(46,168,79,0.1);border:1px solid rgba(46,168,79,0.3);color:var(--accent)}
+  .success-screen{text-align:center;padding:20px 0;display:none}
+  .success-icon{font-size:48px;margin-bottom:16px}
+  .success-title{font-size:20px;font-weight:600;margin-bottom:8px}
+  .success-sub{font-size:14px;color:var(--muted);margin-bottom:24px}
+  .btn-another{padding:10px 24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer}
+  .footer-note{text-align:center;font-size:12px;color:var(--muted);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-area">
+    <div class="logo-badge">
+      <div class="logo-icon">RQ</div>
+      <span class="logo-text">CBA ResolveIQ</span>
+    </div>
+    <h1>Submit feedback</h1>
+    <p class="subtitle">Ceylon Business Appliances · Report a bug, doubt, or suggestion</p>
+  </div>
+
+  <div class="card">
+    <!-- Form -->
+    <div id="form-screen">
+      <div class="form-group">
+        <label class="form-label">Your name</label>
+        <input class="form-input" id="w-name" placeholder="e.g. Nimal Perera">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Department</label>
+        <select class="form-select" id="w-dept">
+          <option value="">Select your department…</option>
+        </select>
+      </div>
+      <div class="form-group" id="w-subservice-group" style="display:none">
+        <label class="form-label">Sub-service</label>
+        <select class="form-select" id="w-subservice">
+          <option value="">Select sub-service…</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="w-type">
+          <option value="doubt">Doubt / Question</option>
+          <option value="suggestion">Suggestion</option>
+          <option value="bug">Bug / Error</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select class="form-select" id="w-priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="w-desc" placeholder="Describe your issue, question, or suggestion in detail…"></textarea>
+      </div>
+      <div id="w-alert"></div>
+      <button class="btn-submit" id="w-submit" onclick="submitWorkerFeedback()">Submit feedback</button>
+    </div>
+
+    <!-- Success screen -->
+    <div class="success-screen" id="success-screen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Feedback submitted!</div>
+      <div class="success-sub">Your feedback has been sent to the IT team. The coordinator will follow up with you.</div>
+      <button class="btn-another" onclick="resetForm()">Submit another</button>
+    </div>
+  </div>
+
+  <p class="footer-note">Your submission is logged and reviewed by the IT coordinator.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig, emailjsConfig, IT_DEVELOPER_EMAILS, FEEDBACK_TYPES } from "../js/config.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let allDepts = [];
+
+// Load EmailJS
+const EJS = document.createElement('script');
+EJS.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+document.head.appendChild(EJS);
+EJS.onload = () => emailjs.init(emailjsConfig.publicKey);
+
+// Load departments from Firestore
+// Load departments from Firestore
+const deptSelect = document.getElementById('w-dept');
+deptSelect.innerHTML = '<option value="">Loading departments…</option>';
+
+try {
+  onSnapshot(collection(db, 'departments'), snap => {
+    allDepts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!allDepts.length) {
+      deptSelect.innerHTML = '<option value="">No departments found — contact coordinator</option>';
+      return;
+    }
+    deptSelect.innerHTML = '<option value="">Select your department…</option>' +
+      allDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+  }, err => {
+    console.error('Firestore error:', err);
+    deptSelect.innerHTML = '<option value="">Unable to load departments</option>';
+    document.getElementById('w-alert').innerHTML =
+      '<div class="alert alert-danger">Could not load departments. Please contact your coordinator.</div>';
+  });
+} catch(e) {
+  deptSelect.innerHTML = '<option value="">Unable to load departments</option>';
+}
+
+document.getElementById('w-dept').addEventListener('change', function() {
+  const dept = allDepts.find(d => d.name === this.value);
+  const group = document.getElementById('w-subservice-group');
+  const select = document.getElementById('w-subservice');
+  if (dept && dept.services && dept.services.length > 0) {
+    select.innerHTML = '<option value="">Select sub-service…</option>' +
+      dept.services.map(s => `<option value="${s}">${s}</option>`).join('');
+    group.style.display = 'block';
+  } else {
+    group.style.display = 'none';
+    select.innerHTML = '<option value="">Select sub-service…</option>';
+  }
+});
+
+window.submitWorkerFeedback = async function() {
+  const name = document.getElementById('w-name').value.trim();
+  const dept = document.getElementById('w-dept').value;
+  const subService = document.getElementById('w-subservice').value || '';
+  const type = document.getElementById('w-type').value;
+  const priority = document.getElementById('w-priority').value;
+  const desc = document.getElementById('w-desc').value.trim();
+  const alertEl = document.getElementById('w-alert');
+  const btn = document.getElementById('w-submit');
+
+  if (!name || !dept || !desc) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Please fill in your name, department, and description.</div>';
+    return;
+  }
+  alertEl.innerHTML = '';
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    const ref = await addDoc(collection(db, 'feedback'), {
+      dept, subService, workerName: name, type, priority,
+      description: desc, status: 'pending', itReply: '',
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      addedBy: 'worker-self-submit'
+    });
+
+    // Notify IT team by email
+    try {
+      await emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId, {
+        to_email: IT_DEVELOPER_EMAILS.join(', '),
+        dept, worker_name: name, type, priority, description: desc,
+        feedback_id: ref.id,
+        dashboard_url: window.location.origin + '/pages/developer.html',
+        submitted_by: name + ' (self-submitted)'
+      });
+    } catch(emailErr) {
+      console.warn('Email notification failed:', emailErr);
+      // Don't block the submission if email fails
+    }
+
+    document.getElementById('form-screen').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'block';
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger">Error submitting: ${e.message}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Submit feedback';
+};
+
+window.resetForm = function() {
+  document.getElementById('w-name').value = '';
+  document.getElementById('w-dept').value = '';
+  document.getElementById('w-desc').value = '';
+  document.getElementById('w-subservice-group').style.display = 'none';
+  document.getElementById('w-alert').innerHTML = '';
+  document.getElementById('form-screen').style.display = 'block';
+  document.getElementById('success-screen').style.display = 'none';
+};
+</script>
+</body>
+</html>

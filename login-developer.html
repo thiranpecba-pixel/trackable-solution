@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IT Developer Login — Trackable Solution</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --danger: #f85149;
+    --role-color: #388bfd;
+    --role-glow: rgba(56,139,253,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex;
+    align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 80% 50%, var(--role-glow) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 20% 30%, rgba(56,139,253,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(48,54,61,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(48,54,61,0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; opacity: 0.5;
+  }
+  .login-wrap {
+    width: 100%; max-width: 420px;
+    padding: 24px; position: relative; z-index: 1;
+    animation: fadeUp 0.4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .logo-area { text-align: center; margin-bottom: 32px; }
+  .logo-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 18px; margin-bottom: 18px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--role-color), #1a5ccc);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-family: 'DM Mono', monospace; font-weight: 500; color: #fff;
+  }
+  .logo-text { font-size: 14px; font-weight: 500; letter-spacing: -0.2px; }
+  .role-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(56,139,253,0.1); border: 1px solid rgba(56,139,253,0.3);
+    border-radius: 99px; padding: 5px 14px;
+    font-size: 12px; font-weight: 600; color: var(--role-color);
+    letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 18px;
+  }
+  .role-pill-dot {
+    width: 6px; height: 6px; background: var(--role-color);
+    border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: var(--muted); }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px;
+  }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 12px; font-weight: 500; color: var(--muted);
+    margin-bottom: 6px; letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .form-group input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s;
+  }
+  .form-group input:focus { border-color: var(--role-color); }
+  .btn-login {
+    width: 100%; padding: 11px;
+    background: var(--role-color); color: #fff; border: none;
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity 0.15s; margin-top: 4px;
+  }
+  .btn-login:hover { opacity: 0.88; }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error-msg {
+    background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--danger);
+    margin-top: 14px; display: none;
+  }
+  .footer-note {
+    text-align: center; font-size: 12px; color: var(--muted);
+    margin-top: 20px; line-height: 1.8;
+  }
+  .footer-note a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .footer-note a:hover { color: var(--text); }
+  #loading-spinner { display: none; text-align: center; padding: 12px 0 0; color: var(--muted); font-size: 13px; }
+  .dot { display: inline-block; animation: blink 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="login-wrap">
+  <div class="logo-area">
+    <div class="logo-badge">
+      <div class="logo-icon">TS</div>
+      <span class="logo-text">Trackable Solution</span>
+    </div>
+    <div><div class="role-pill"><span class="role-pill-dot"></span> IT Developer Portal</div></div>
+    <h1>Welcome back</h1>
+    <p class="subtitle">Ceylon Business Appliances · Trial Feedback System</p>
+  </div>
+  <div class="card">
+    <div class="form-group">
+      <label>Email address</label>
+      <input type="email" id="email" placeholder="you@ceylonba.com" autocomplete="email"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">Sign in as IT Developer</button>
+    <div class="error-msg" id="err"></div>
+    <div id="loading-spinner">Signing in<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+  </div>
+  <p class="footer-note">
+    Not on the IT team?<br>
+    <a href="index.html">Coordinator login</a> &nbsp;·&nbsp;
+    <a href="login-management.html">Management login</a>
+  </p>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, getDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
+    authDomain: "trackable-progress.firebaseapp.com",
+    projectId: "trackable-progress",
+    storageBucket: "trackable-progress.firebasestorage.app",
+    messagingSenderId: "961877401670",
+    appId: "1:961877401670:web:ff3ad97b1dcf7906572a47"
+  };
+
+  // ── Only IT developers are allowed on this page ──
+  // Matches any of these Firestore role values
+  const ALLOWED_ROLES = ['developer', 'it', 'it_developer'];
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  await setPersistence(auth, browserSessionPersistence);
+
+ setPersistence(auth, browserSessionPersistence).then(() => {
+    // Auto-redirect if already signed in with the right role
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (!snap.exists()) { await signOut(auth); return; }
+      const role = snap.data().role;
+      if (ALLOWED_ROLES.includes(role)) {
+        window.location.href = 'pages/developer.html';
+      } else {
+        await signOut(auth);
+      }
+    });
+  });
+
+  function showErr(msg) {
+    const el = document.getElementById('err');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function setLoading(on) {
+    document.getElementById('login-btn').disabled = on;
+    document.getElementById('loading-spinner').style.display = on ? 'block' : 'none';
+  }
+
+  window.doLogin = async function() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    document.getElementById('err').style.display = 'none';
+    if (!email || !password) { showErr('Please enter your email and password.'); return; }
+
+    setLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(db, 'users', cred.user.uid));
+
+      if (!snap.exists()) {
+        await signOut(auth);
+        showErr('Account not recognized. Contact your coordinator for access.');
+        return;
+      }
+
+      const role = snap.data().role;
+
+      if (!ALLOWED_ROLES.includes(role)) {
+        await signOut(auth);
+        showErr('This account does not have IT Developer access. Please use the correct login page for your role.');
+        return;
+      }
+
+      window.location.href = 'pages/developer.html';
+
+    } catch(e) {
+      showErr('Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin(); });
+</script>
+</body>
+</html>
