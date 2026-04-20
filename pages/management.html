@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Management View — Trackable Solution</title>
+<title>Management View — CBA ResolveIQ</title>
 <link rel="stylesheet" href="../css/main.css"/>
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">TS</div>
-      <div><div class="logo-label">Trackable Solution</div><div class="logo-sub">Management View</div></div>
+      <div class="logo-icon">RQ</div>
+      <div><div class="logo-label">CBA ResolveIQ</div><div class="logo-sub">Management View</div></div>
     </div>
     <div class="nav-section">
       <div class="nav-label">Reports</div>
@@ -33,7 +33,7 @@
     <div class="topbar">
       <div>
         <div class="page-title" id="page-title">Overview</div>
-        <div class="page-breadcrumb">Ceylon Business Appliances · Trackable Solution Trial — Read-only report</div>
+        <div class="page-breadcrumb">Ceylon Business Appliances · CBA ResolveIQ — Read-only report</div>
       </div>
       <div class="topbar-right">
         <button class="btn" onclick="generateReport()">⬇ Download report</button>
@@ -647,7 +647,7 @@ window.generateReport = async function() {
   setFill(C.surface); doc.roundedRect(margin, 40, 40, 14, 3, 3, 'F');
   setFill(C.purple);  doc.roundedRect(margin+2, 42, 10, 10, 2, 2, 'F');
   setFont(7,'bold'); setTxt(C.white); doc.text('TS', margin+7, 48.5, {align:'center'});
-  setFont(9,'bold'); setTxt(C.text);  doc.text('Trackable Solution', margin+15, 48.5);
+  setFont(9,'bold'); setTxt(C.text);  doc.text('CBA ResolveIQ', margin+15, 48.5);
 
   setFont(28,'bold'); setTxt(C.white); doc.text('Management Report', margin, 90);
   setFont(11); setTxt(C.muted); doc.text('Ceylon Business Appliances — Executive Summary', margin, 100);
@@ -820,10 +820,10 @@ window.generateReport = async function() {
     doc.setPage(i);
     setFont(7); setTxt(C.muted);
     doc.text(`Page ${i} of ${totalPages}`, W-margin, H-8, {align:'right'});
-    doc.text('Trackable Solution — Ceylon Business Appliances', margin, H-8);
+    doc.text('CBA ResolveIQ — Ceylon Business Appliances', margin, H-8);
   }
 
-  doc.save(`trackable-management-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  doc.save(`resolveiq-management-report-${new Date().toISOString().split('T')[0]}.pdf`);
   if (btn) { btn.disabled = false; btn.textContent = '⬇ Download report'; }
 };
 
