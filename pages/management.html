@@ -16,6 +16,7 @@
     <div class="nav-section">
       <div class="nav-label">Reports</div>
       <button class="nav-item active" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
+      <button class="nav-item" onclick="showSection('dailylog',this)"><span class="icon">📋</span> Daily Log</button>
       <button class="nav-item" onclick="showSection('engagement',this)"><span class="icon">◈</span> Engagement</button>
       <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
       <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
@@ -67,6 +68,48 @@
             <div class="section-title mb-16">Priority breakdown</div>
             <div id="priority-breakdown"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- DAILY LOG -->
+      <div id="sec-dailylog" class="section-panel" style="display:none">
+
+        <div class="card mb-16" style="background:linear-gradient(135deg,rgba(46,168,79,0.08),transparent);border-color:rgba(46,168,79,0.25)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:28px">📋</div>
+            <div>
+              <div class="section-title" style="color:var(--accent)">Coordinator Daily Log</div>
+              <div class="section-sub">Daily notes, activity summaries and target updates posted by the trial coordinator</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="card mb-16" style="padding:14px 18px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:180px">
+              <select class="form-select" id="mgmt-dl-date-filter" onchange="renderMgmtDailyLogs()" style="width:100%">
+                <option value="">All dates</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:160px">
+              <select class="form-select" id="mgmt-dl-status-filter" onchange="renderMgmtDailyLogs()" style="width:100%">
+                <option value="">All statuses</option>
+                <option value="on-track">🟢 On track</option>
+                <option value="partial">🟡 Partially achieved</option>
+                <option value="blocked">🔴 Blocked / not met</option>
+              </select>
+            </div>
+            <button class="btn btn-sm" onclick="loadMgmtDailyLogs()" style="white-space:nowrap">↺ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Summary strip -->
+        <div class="metric-grid" id="dl-summary-strip" style="margin-bottom:16px"></div>
+
+        <!-- Log entries -->
+        <div id="mgmt-daily-log-list">
+          <div class="empty-state"><div class="icon">📋</div><p>Loading logs…</p></div>
         </div>
       </div>
 
@@ -175,7 +218,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
@@ -219,7 +262,7 @@ function dayKey(date) { return date.toISOString().split('T')[0]; }
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-let allFeedback = [], allTimeline = [], allCheckins = [], allDepts = [], currentUser = null;
+let allFeedback = [], allTimeline = [], allCheckins = [], allDepts = [], allDailyLogs = [], currentUser = null;
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = '../portal.html'; return; }
@@ -570,9 +613,10 @@ window.showSection = function(sec, el) {
   document.getElementById('sec-' + sec).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  const titles = { overview:'Overview', engagement:'Engagement', departments:'Departments', timeline:'Timeline' };
+  const titles = { overview:'Overview', dailylog:'Daily Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline' };
   document.getElementById('page-title').textContent = titles[sec] || sec;
   if (sec === 'engagement') renderEngagement();
+  if (sec === 'dailylog')   loadMgmtDailyLogs();
 };
 
 window.generateReport = async function() {
@@ -840,81 +884,182 @@ function loadScript(src) {
 }
 
 window.doSignOut = async () => { await signOut(auth); window.location.href = '../portal.html'; };
+
+// ══════════════════════════════════════════
+// DAILY LOG (read-only for management)
+// ══════════════════════════════════════════
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.loadMgmtDailyLogs = async function() {
+  try {
+    const snap = await getDocs(query(collection(db, 'dailyLogs'), orderBy('createdAt', 'desc')));
+    allDailyLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    populateMgmtDateFilter();
+    renderMgmtSummaryStrip();
+    renderMgmtDailyLogs();
+  } catch(e) {
+    document.getElementById('mgmt-daily-log-list').innerHTML =
+      `<div class="empty-state"><p style="color:var(--danger)">Failed to load logs: ${e.message}</p></div>`;
+  }
+};
+
+function populateMgmtDateFilter() {
+  const sel = document.getElementById('mgmt-dl-date-filter');
+  if (!sel) return;
+  const existing = sel.value;
+  const dates = [...new Set(allDailyLogs.map(l => {
+    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+    return d ? d.toISOString().split('T')[0] : null;
+  }).filter(Boolean))].sort().reverse();
+  sel.innerHTML = '<option value="">All dates</option>' +
+    dates.map(dk => {
+      const label = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+      return `<option value="${dk}" ${existing === dk ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+}
+
+function renderMgmtSummaryStrip() {
+  const el = document.getElementById('dl-summary-strip');
+  if (!el) return;
+  const total    = allDailyLogs.length;
+  const onTrack  = allDailyLogs.filter(l => l.targetStatus === 'on-track').length;
+  const partial  = allDailyLogs.filter(l => l.targetStatus === 'partial').length;
+  const blocked  = allDailyLogs.filter(l => l.targetStatus === 'blocked').length;
+  el.innerHTML = `
+    <div class="metric-card"><div class="metric-label">Total logs</div><div class="metric-value">${total}</div><div class="metric-sub">All time</div></div>
+    <div class="metric-card"><div class="metric-label">On track</div><div class="metric-value" style="color:var(--accent)">${onTrack}</div><div class="metric-sub">Targets met</div></div>
+    <div class="metric-card"><div class="metric-label">Partial</div><div class="metric-value" style="color:var(--warn)">${partial}</div><div class="metric-sub">Partially achieved</div></div>
+    <div class="metric-card"><div class="metric-label">Blocked</div><div class="metric-value" style="color:var(--danger)">${blocked}</div><div class="metric-sub">Targets not met</div></div>`;
+}
+
+window.renderMgmtDailyLogs = function() {
+  const el = document.getElementById('mgmt-daily-log-list');
+  if (!el) return;
+  const filterDate   = document.getElementById('mgmt-dl-date-filter')?.value || '';
+  const filterStatus = document.getElementById('mgmt-dl-status-filter')?.value || '';
+  let list = allDailyLogs;
+  if (filterDate) {
+    list = list.filter(l => {
+      const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+      return d && d.toISOString().split('T')[0] === filterDate;
+    });
+  }
+  if (filterStatus) {
+    list = list.filter(l => l.targetStatus === filterStatus);
+  }
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No logs matching this filter</p></div>';
+    return;
+  }
+  const statusMeta = {
+    'on-track': { label: 'On track',          color: 'var(--accent)',  icon: '🟢' },
+    'partial':  { label: 'Partially achieved', color: 'var(--warn)',    icon: '🟡' },
+    'blocked':  { label: 'Blocked / not met',  color: 'var(--danger)',  icon: '🔴' }
+  };
+  el.innerHTML = list.map(l => {
+    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+    const timeStr = d ? d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+      + ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
+    const sm = statusMeta[l.targetStatus] || statusMeta['on-track'];
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;background:var(--surface2)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#1a7a35);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;flex-shrink:0">
+            ${(l.authorName||'C').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:600">${l.authorName || 'Coordinator'}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">${timeStr}</div>
+          </div>
+        </div>
+        <span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px;background:rgba(0,0,0,0.25);color:${sm.color};border:1px solid ${sm.color}44">
+          ${sm.icon} ${sm.label}
+        </span>
+      </div>
+      <div style="margin-bottom:${l.targets ? '14px' : '0'}">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">📝 Daily Notes</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">${escapeHtml(l.notes || '')}</div>
+      </div>
+      ${l.targets ? `<div style="border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">🎯 Targets &amp; Goals</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">${escapeHtml(l.targets)}</div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+};
 </script>
+
 
 <!-- ── LIGHT / DARK MODE ── -->
 <style>
-/* ── Light mode: fill ALL variables that main.css doesn't cover ──
-   main.css body.light only sets --bg/surface/surface2/surface3/border/border2/text/muted
-   We patch the rest here so accent-dim, warn-dim, danger-dim, purple-dim, muted2, etc.
-   all become light-appropriate values.                                         */
-body.light {
-  /* Accent / status colours — slightly deeper for legibility on white */
-  --accent:       #1a7f37;
-  --accent-dim:   rgba(26,127,55,0.1);
-  --accent2:      #0969da;
-  --accent2-dim:  rgba(9,105,218,0.1);
-  --warn:         #9a6700;
-  --warn-dim:     rgba(154,103,0,0.1);
-  --danger:       #cf222e;
-  --danger-dim:   rgba(207,34,46,0.1);
-  --purple:       #8250df;
-  --purple-dim:   rgba(130,80,223,0.1);
-
-  /* Surface / border extras not in main.css body.light block */
-  --muted2:       #8c959f;
-
-  /* Timeline dot border needs to match light bg */
-  --bg: #f6f8fa;
+/* ── Dark mode (default) — matches existing main.css dark palette ── */
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --surface2: #1c2128;
+  --border:   #30363d;
+  --text:     #e6edf3;
+  --muted:    #7d8590;
+  --accent:   #2ea84f;
+  --accent2:  #388bfd;
+  --warn:     #d29922;
+  --danger:   #f85149;
+  --purple:   #bc8cff;
+  --blue:     #388bfd;
+  --sidebar-bg:     #0d1117;
+  --topbar-bg:      rgba(13,17,23,0.92);
+  --card-bg:        #161b22;
+  --input-bg:       #0d1117;
+  --scrollbar-thumb:#30363d;
 }
 
-/* ── Structural fixes: elements that use hard-coded dark hex in main.css ── */
-
-/* Nav active state — accent-dim bg is now correct in light */
-body.light .nav-item.active { background: var(--accent-dim); color: var(--accent); }
-
-/* Progress bar track */
-body.light .progress-bar { background: var(--surface3); }
-
-/* Timeline line */
-body.light .timeline::before { background: var(--border); }
-
-/* Timeline dot border uses --bg to cut out, must be light bg */
-body.light .tl-dot { border-color: var(--bg); }
-body.light .tl-dot.plan { background: var(--surface3); border-color: var(--border2); }
-
-/* Filter chips — active state */
-body.light .filter-chip.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
-
-/* Scrollbar */
-body.light ::-webkit-scrollbar-thumb { background: var(--surface3); }
-
-/* Inline border-bottom rows in engagement/checkin lists */
-body.light [style*="border-bottom:1px solid var(--border)"] { border-color: var(--border) !important; }
-
-/* Inactive dept alert cards — softer red tint on white */
-body.light [style*="rgba(248,81,73,0.06)"] {
-  background: rgba(207,34,46,0.05) !important;
-  border-color: rgba(207,34,46,0.2) !important;
+/* ── Light mode overrides ── */
+html[data-theme="light"] {
+  --bg:       #f6f8fa;
+  --surface:  #ffffff;
+  --surface2: #eaeef2;
+  --border:   #d0d7de;
+  --text:     #1f2328;
+  --muted:    #636c76;
+  --accent:   #1a7f37;
+  --accent2:  #0969da;
+  --warn:     #9a6700;
+  --danger:   #cf222e;
+  --purple:   #8250df;
+  --blue:     #0969da;
+  --sidebar-bg:     #f6f8fa;
+  --topbar-bg:      rgba(246,248,250,0.92);
+  --card-bg:        #ffffff;
+  --input-bg:       #f6f8fa;
+  --scrollbar-thumb:#d0d7de;
 }
 
-/* User avatar border/colour inherits --accent2 — fine, no override needed */
+/* Apply CSS variables to base elements (so external main.css var() calls auto-update) */
+html[data-theme="light"] body           { background: var(--bg); color: var(--text); }
+html[data-theme="light"] .sidebar       { background: var(--sidebar-bg); border-color: var(--border); }
+html[data-theme="light"] .topbar        { background: var(--topbar-bg); border-color: var(--border); }
+html[data-theme="light"] .card,
+html[data-theme="light"] .metric-card,
+html[data-theme="light"] .dept-card     { background: var(--card-bg); border-color: var(--border); }
+html[data-theme="light"] .nav-item      { color: var(--muted); }
+html[data-theme="light"] .nav-item:hover,
+html[data-theme="light"] .nav-item.active { background: var(--surface2); color: var(--text); }
+html[data-theme="light"] .sidebar-footer { border-color: var(--border); }
+html[data-theme="light"] .progress-bar  { background: var(--surface2); }
+html[data-theme="light"] .filter-chip   { background: var(--surface2); color: var(--muted); border-color: var(--border); }
+html[data-theme="light"] .filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+html[data-theme="light"] .btn           { background: var(--surface2); color: var(--text); border-color: var(--border); }
+html[data-theme="light"] .btn:hover     { background: var(--border); }
+html[data-theme="light"] .tl-item .tl-body { border-color: var(--border); }
+html[data-theme="light"] .badge         { opacity: 0.9; }
+html[data-theme="light"] select,
+html[data-theme="light"] input,
+html[data-theme="light"] textarea       { background: var(--input-bg); color: var(--text); border-color: var(--border); }
 
-/* Form inputs: surface2 bg already picks up the light value */
-body.light .form-input,
-body.light .form-select,
-body.light .form-textarea,
-body.light .search-input { background: var(--surface2); color: var(--text); border-color: var(--border); }
-
-/* Modal backdrop slightly lighter */
-body.light .modal-overlay { background: rgba(0,0,0,0.35); }
-body.light .modal { background: var(--surface); border-color: var(--border2); }
-
-/* Topbar & sidebar already handled by main.css body.light, but add box-shadow for depth */
-body.light .topbar  { box-shadow: 0 1px 0 var(--border); background: #ffffff; }
-body.light .sidebar { box-shadow: 1px 0 0 var(--border); background: #ffffff; }
-
-/* ── Theme toggle button ── */
+/* Theme toggle button */
 .btn-theme-toggle {
   font-size: 16px !important;
   padding: 0 10px !important;
@@ -925,21 +1070,23 @@ body.light .sidebar { box-shadow: 1px 0 0 var(--border); background: #ffffff; }
 
 <script>
 (function() {
+  // Persist preference in localStorage
   const saved = localStorage.getItem('resolveiq-theme') || 'dark';
   applyTheme(saved);
 
   function applyTheme(theme) {
-    document.body.classList.toggle('light', theme === 'light');
+    document.documentElement.setAttribute('data-theme', theme);
     const icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = theme === 'light' ? '🌙' : '☀';
     localStorage.setItem('resolveiq-theme', theme);
   }
 
   window.toggleTheme = function() {
-    const isLight = document.body.classList.contains('light');
-    applyTheme(isLight ? 'dark' : 'light');
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
   };
 
+  // Re-apply once DOM is ready (in case icon wasn't available yet above)
   document.addEventListener('DOMContentLoaded', () => applyTheme(saved));
 })();
 </script>
