@@ -22,6 +22,7 @@
       <button class="nav-item" onclick="showSection('engagement',this)"><span class="icon">◈</span> Engagement</button>
       <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
       <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
+      <button class="nav-item" onclick="showSection('dailylog',this)"><span class="icon">📋</span> Daily Log</button>
       <div class="nav-label" style="margin-top:16px">Admin</div>
       <button class="nav-item" onclick="showSection('users',this)"><span class="icon">◉</span> Manage Users</button>
     </div>
@@ -230,6 +231,62 @@
         </div>
       </div>
 
+      <!-- ══ DAILY LOG ══ -->
+      <div id="sec-dailylog" class="section-panel" style="display:none">
+
+        <!-- Compose card -->
+        <div class="card mb-16">
+          <div class="section-hdr mb-16">
+            <div>
+              <div class="section-title">📋 Daily Notes &amp; Targets</div>
+              <div class="section-sub">Log today's activity and set targets — visible to management</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted)" id="dl-today-label"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Today's summary / notes</label>
+            <textarea class="form-textarea" id="dl-notes" rows="4"
+              placeholder="Summarise what happened today — sessions held, departments visited, issues raised, actions taken…"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Targets / goals for today</label>
+            <textarea class="form-textarea" id="dl-targets" rows="3"
+              placeholder="e.g. Follow up with Accounts dept, resolve 5 pending bugs, run training session for Warehouse…"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target completion status</label>
+            <select class="form-select" id="dl-target-status" style="width:auto">
+              <option value="on-track">🟢 On track</option>
+              <option value="partial">🟡 Partially achieved</option>
+              <option value="blocked">🔴 Blocked / not met</option>
+            </select>
+          </div>
+
+          <div id="dl-compose-alert"></div>
+          <div class="modal-footer" style="padding:0;margin-top:12px;border:none">
+            <button class="btn btn-sm" onclick="loadDailyLogs()" style="color:var(--muted)">↺ Refresh</button>
+            <button class="btn btn-primary" id="dl-submit-btn" onclick="submitDailyLog()">Post daily log</button>
+          </div>
+        </div>
+
+        <!-- Log history -->
+        <div class="card">
+          <div class="section-hdr mb-16">
+            <div>
+              <div class="section-title">Log history</div>
+              <div class="section-sub">All posted daily notes — newest first</div>
+            </div>
+            <select class="form-select" style="width:auto;font-size:12px" id="dl-filter-date" onchange="renderDailyLogs()">
+              <option value="">All dates</option>
+            </select>
+          </div>
+          <div id="daily-log-list"><div class="empty-state"><div class="icon">📋</div><p>No logs posted yet</p></div></div>
+        </div>
+      </div>
+
       <!-- ══ USERS ══ -->
       <div id="sec-users" class="section-panel" style="display:none">
         <div class="card mb-16">
@@ -375,7 +432,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, emailjsConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
 
 window.toggleTheme = function() {
@@ -399,7 +456,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [], allCheckins = [];
+let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [], allCheckins = [], allDailyLogs = [];
 let statusFilter = 'all', typeFilter = '', editingTimelineId = null;
 
 // ── Auth guard ──
@@ -1438,9 +1495,10 @@ window.showSection = function(sec, el) {
   document.getElementById('sec-' + sec).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  const titles = { overview:'Overview', feedback:'Feedback Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline', users:'Manage Users' };
+  const titles = { overview:'Overview', feedback:'Feedback Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline', dailylog:'Daily Log', users:'Manage Users' };
   document.getElementById('page-title').textContent = titles[sec] || sec;
   if (sec === 'engagement') { renderEngagement(); renderCheckinLog(); }
+  if (sec === 'dailylog')   { loadDailyLogs(); updateDailyLogDateLabel(); }
 };
 
 window.setStatusFilter = function(val, el) {
@@ -1618,6 +1676,143 @@ window.postThreadMessage = async function() {
   document.getElementById('thread-input').value = '';
   document.getElementById('thread-alert').innerHTML = '';
 };
+
+// ══════════════════════════════════════════
+// DAILY LOG
+// ══════════════════════════════════════════
+
+function updateDailyLogDateLabel() {
+  const el = document.getElementById('dl-today-label');
+  if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+
+window.loadDailyLogs = async function() {
+  try {
+    const snap = await getDocs(query(collection(db, 'dailyLogs'), orderBy('createdAt', 'desc')));
+    allDailyLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    populateDailyLogDateFilter();
+    renderDailyLogs();
+  } catch(e) {
+    console.error('Daily logs load error:', e);
+  }
+};
+
+function populateDailyLogDateFilter() {
+  const sel = document.getElementById('dl-filter-date');
+  if (!sel) return;
+  // Collect unique date strings (YYYY-MM-DD)
+  const dates = [...new Set(allDailyLogs.map(l => {
+    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+    return d ? d.toISOString().split('T')[0] : null;
+  }).filter(Boolean))].sort().reverse();
+  const existing = sel.value;
+  sel.innerHTML = '<option value="">All dates</option>' +
+    dates.map(dk => {
+      const label = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+      return `<option value="${dk}" ${existing === dk ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+}
+
+window.renderDailyLogs = function() {
+  const el = document.getElementById('daily-log-list');
+  if (!el) return;
+  const filterDate = document.getElementById('dl-filter-date')?.value || '';
+  let list = allDailyLogs;
+  if (filterDate) {
+    list = list.filter(l => {
+      const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+      return d && d.toISOString().split('T')[0] === filterDate;
+    });
+  }
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No logs for this date</p></div>';
+    return;
+  }
+  const statusMeta = {
+    'on-track': { label: 'On track',          color: 'var(--accent)',  icon: '🟢' },
+    'partial':  { label: 'Partially achieved', color: 'var(--warn)',    icon: '🟡' },
+    'blocked':  { label: 'Blocked / not met',  color: 'var(--danger)',  icon: '🔴' }
+  };
+  el.innerHTML = list.map(l => {
+    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
+    const timeStr = d ? d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+      + ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
+    const sm = statusMeta[l.targetStatus] || statusMeta['on-track'];
+    const isOwn = l.authorId === currentUser?.uid;
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;background:var(--surface2)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${l.authorName || 'Coordinator'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${timeStr}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(0,0,0,0.2);color:${sm.color};border:1px solid ${sm.color}33">
+            ${sm.icon} ${sm.label}
+          </span>
+          ${isOwn ? `<button class="btn btn-sm" style="color:var(--danger);padding:2px 8px;font-size:11px" onclick="deleteDailyLog('${l.id}')">✕</button>` : ''}
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px">📝 Notes</div>
+        <div style="font-size:13px;line-height:1.65;color:var(--text);white-space:pre-wrap">${escapeHtml(l.notes || '')}</div>
+      </div>
+      ${l.targets ? `<div style="border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px">🎯 Targets</div>
+        <div style="font-size:13px;line-height:1.65;color:var(--text);white-space:pre-wrap">${escapeHtml(l.targets)}</div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+};
+
+window.submitDailyLog = async function() {
+  const notes   = document.getElementById('dl-notes').value.trim();
+  const targets = document.getElementById('dl-targets').value.trim();
+  const targetStatus = document.getElementById('dl-target-status').value;
+  const alertEl = document.getElementById('dl-compose-alert');
+  alertEl.innerHTML = '';
+
+  if (!notes) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Please write at least a summary note.</div>';
+    return;
+  }
+
+  const btn = document.getElementById('dl-submit-btn');
+  btn.disabled = true; btn.textContent = 'Posting…';
+
+  try {
+    await addDoc(collection(db, 'dailyLogs'), {
+      notes,
+      targets,
+      targetStatus,
+      authorId:   currentUser.uid,
+      authorName: currentUser.name || 'Coordinator',
+      createdAt:  serverTimestamp()
+    });
+    document.getElementById('dl-notes').value   = '';
+    document.getElementById('dl-targets').value = '';
+    document.getElementById('dl-target-status').value = 'on-track';
+    showAlert('Daily log posted and visible to management!', 'success');
+    await loadDailyLogs();
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Post daily log';
+};
+
+window.deleteDailyLog = async function(id) {
+  if (!confirm('Delete this daily log entry?')) return;
+  try {
+    await deleteDoc(doc(db, 'dailyLogs', id));
+    showAlert('Log entry deleted.', 'success');
+    await loadDailyLogs();
+  } catch(e) {
+    showAlert('Failed to delete: ' + e.message, 'danger');
+  }
+};
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 function showAlert(msg, type) {
   const el = document.getElementById('alert-area');
