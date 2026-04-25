@@ -16,7 +16,6 @@
     <div class="nav-section">
       <div class="nav-label">Reports</div>
       <button class="nav-item active" onclick="showSection('overview',this)"><span class="icon">⊞</span> Overview</button>
-      <button class="nav-item" onclick="showSection('dailylog',this)"><span class="icon">📋</span> Daily Log</button>
       <button class="nav-item" onclick="showSection('engagement',this)"><span class="icon">◈</span> Engagement</button>
       <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
       <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
@@ -68,48 +67,6 @@
             <div class="section-title mb-16">Priority breakdown</div>
             <div id="priority-breakdown"></div>
           </div>
-        </div>
-      </div>
-
-      <!-- DAILY LOG -->
-      <div id="sec-dailylog" class="section-panel" style="display:none">
-
-        <div class="card mb-16" style="background:linear-gradient(135deg,rgba(46,168,79,0.08),transparent);border-color:rgba(46,168,79,0.25)">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="font-size:28px">📋</div>
-            <div>
-              <div class="section-title" style="color:var(--accent)">Coordinator Daily Log</div>
-              <div class="section-sub">Daily notes, activity summaries and target updates posted by the trial coordinator</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Filter bar -->
-        <div class="card mb-16" style="padding:14px 18px">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <div style="flex:1;min-width:180px">
-              <select class="form-select" id="mgmt-dl-date-filter" onchange="renderMgmtDailyLogs()" style="width:100%">
-                <option value="">All dates</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:160px">
-              <select class="form-select" id="mgmt-dl-status-filter" onchange="renderMgmtDailyLogs()" style="width:100%">
-                <option value="">All statuses</option>
-                <option value="on-track">🟢 On track</option>
-                <option value="partial">🟡 Partially achieved</option>
-                <option value="blocked">🔴 Blocked / not met</option>
-              </select>
-            </div>
-            <button class="btn btn-sm" onclick="loadMgmtDailyLogs()" style="white-space:nowrap">↺ Refresh</button>
-          </div>
-        </div>
-
-        <!-- Summary strip -->
-        <div class="metric-grid" id="dl-summary-strip" style="margin-bottom:16px"></div>
-
-        <!-- Log entries -->
-        <div id="mgmt-daily-log-list">
-          <div class="empty-state"><div class="icon">📋</div><p>Loading logs…</p></div>
         </div>
       </div>
 
@@ -189,6 +146,21 @@
 
           <!-- Right: completion stats -->
           <div>
+            <!-- Grand total card — aggregates ALL phases across all scopes -->
+            <div class="card mb-16" id="tl-grand-total-card" style="border-color:rgba(46,168,79,0.35);background:linear-gradient(135deg,rgba(46,168,79,0.06),transparent)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div class="section-title" style="color:var(--accent)">⊞ Grand total</div>
+                <span style="font-size:11px;color:var(--muted)" id="tl-grand-phase-count">— phases total</span>
+              </div>
+              <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:4px;color:var(--accent)" id="tl-grand-pct">0%</div>
+              <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="tl-grand-bar" style="width:0%;background:var(--accent)"></div></div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+                <span style="font-size:11px;color:var(--accent)"><span id="tl-grand-done">0</span> done</span>
+                <span style="font-size:11px;color:var(--accent2)"><span id="tl-grand-wip">0</span> in progress</span>
+                <span style="font-size:11px;color:var(--muted)"><span id="tl-grand-plan">0</span> planned</span>
+              </div>
+            </div>
+
             <div class="card mb-16">
               <div class="section-title mb-8" id="tl-pct-label">Overall completion</div>
               <div style="font-size:40px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;margin-top:12px" id="overall-pct">0%</div>
@@ -218,7 +190,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAFBJ9_Q--KUyBltOa0Rn3rbck6mg22PLk",
@@ -262,7 +234,7 @@ function dayKey(date) { return date.toISOString().split('T')[0]; }
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-let allFeedback = [], allTimeline = [], allCheckins = [], allDepts = [], allDailyLogs = [], currentUser = null;
+let allFeedback = [], allTimeline = [], allCheckins = [], allDepts = [], currentUser = null;
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = '../portal.html'; return; }
@@ -412,10 +384,24 @@ function renderTimeline() {
   renderTimelineDeptTabs();
 
   const isOverall = currentTimelineScope === 'overall';
-  // Phases with no scope, scope='overall', or scope='' all belong to Overall
   const phasesForScope = isOverall
     ? allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '')
     : allTimeline.filter(p => p.scope === currentTimelineScope);
+
+  // ── Grand total: ALL phases across every scope ──
+  const gtDone  = allTimeline.filter(p => p.status === 'done').length;
+  const gtWip   = allTimeline.filter(p => p.status === 'wip').length;
+  const gtPlan  = allTimeline.filter(p => p.status === 'plan').length;
+  const gtTotal = allTimeline.length;
+  const gtPct   = gtTotal ? Math.round(gtDone / gtTotal * 100) : 0;
+  const gtColor = gtPct === 100 ? 'var(--accent)' : gtPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+  document.getElementById('tl-grand-pct').textContent         = gtPct + '%';
+  document.getElementById('tl-grand-bar').style.width         = gtPct + '%';
+  document.getElementById('tl-grand-bar').style.background    = gtColor;
+  document.getElementById('tl-grand-phase-count').textContent = `${gtTotal} phase${gtTotal !== 1 ? 's' : ''} total`;
+  document.getElementById('tl-grand-done').textContent        = gtDone;
+  document.getElementById('tl-grand-wip').textContent         = gtWip;
+  document.getElementById('tl-grand-plan').textContent        = gtPlan;
 
   // Update headings
   document.getElementById('tl-scope-title').textContent = isOverall
@@ -424,7 +410,7 @@ function renderTimeline() {
   document.getElementById('tl-scope-sub').textContent = isOverall
     ? 'All departments · Project milestone tracker'
     : 'Department-specific milestone tracker';
-  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall completion' : `${currentTimelineScope} completion`;
+  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall-scope completion' : `${currentTimelineScope} completion`;
 
   // Show/hide dept breakdown panel
   document.getElementById('tl-dept-breakdown').style.display = isOverall ? '' : 'none';
@@ -457,27 +443,45 @@ function renderTimeline() {
       </div>`).join('');
   }
 
-  // Dept breakdown (only on Overall tab) — read-only, clickable to switch tab
+  // Dept breakdown (only on Overall tab) — includes overall-scope row + grand total footer
   if (isOverall) {
-    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
-    const depts = [...new Set(deptPhases.map(p => p.scope))].sort();
-    const breakdownEl = document.getElementById('tl-dept-breakdown-list');
-    if (!depts.length) {
-      breakdownEl.innerHTML = '<div class="text-sm text-muted">No department-specific phases yet</div>';
+    const deptPhases    = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
+    const depts         = [...new Set(deptPhases.map(p => p.scope))].sort();
+    const overallPhases = allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '');
+    const breakdownEl   = document.getElementById('tl-dept-breakdown-list');
+
+    const makeRow = (label, items, clickScope, isOvRow, isTotalRow) => {
+      const rDone  = items.filter(p => p.status === 'done').length;
+      const rTotal = items.length;
+      const rPct   = rTotal ? Math.round(rDone / rTotal * 100) : 0;
+      const rColor = rPct === 100 ? 'var(--accent)' : rPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+      const nameStyle = isTotalRow
+        ? 'font-size:13px;font-weight:700;color:var(--text)'
+        : isOvRow
+        ? 'font-size:13px;font-weight:500;color:var(--muted);font-style:italic'
+        : 'font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)';
+      const onclick = (!isTotalRow && !isOvRow && clickScope)
+        ? `onclick="switchTimelineScope('${clickScope.replace(/'/g, "\\'")}',null)"`
+        : '';
+      const prefix    = isTotalRow ? '⊞ ' : isOvRow ? '↳ ' : '';
+      const topBorder = isTotalRow ? 'padding-top:10px;border-top:1px solid var(--border);' : '';
+      return `<div style="margin-bottom:${isTotalRow ? 0 : 14}px;${topBorder}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+          <span style="${nameStyle}" ${onclick}>${prefix}${label}</span>
+          <span style="font-size:12px;color:${isTotalRow ? 'var(--text)' : 'var(--muted)'};${isTotalRow ? 'font-weight:600' : ''}">${rDone}/${rTotal} done</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${rPct}%;background:${rColor}"></div></div>
+      </div>`;
+    };
+
+    if (!overallPhases.length && !depts.length) {
+      breakdownEl.innerHTML = '<div class="text-sm text-muted">No phases yet across any department</div>';
     } else {
-      breakdownEl.innerHTML = depts.map(d => {
-        const items = deptPhases.filter(p => p.scope === d);
-        const dDone = items.filter(p => p.status === 'done').length;
-        const dPct = items.length ? Math.round(dDone / items.length * 100) : 0;
-        const dColor = dPct === 100 ? 'var(--accent)' : dPct > 50 ? 'var(--accent2)' : 'var(--warn)';
-        return `<div style="margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
-            <span style="font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',null)">${d}</span>
-            <span style="font-size:12px;color:var(--muted)">${dDone}/${items.length} done</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${dPct}%;background:${dColor}"></div></div>
-        </div>`;
-      }).join('');
+      let html = '';
+      if (overallPhases.length) html += makeRow('Overall-scope phases', overallPhases, null, true, false);
+      depts.forEach(d => { html += makeRow(d, deptPhases.filter(p => p.scope === d), d, false, false); });
+      if (allTimeline.length) html += makeRow('Grand total (all phases)', allTimeline, null, false, true);
+      breakdownEl.innerHTML = html;
     }
   }
 }
@@ -613,10 +617,9 @@ window.showSection = function(sec, el) {
   document.getElementById('sec-' + sec).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  const titles = { overview:'Overview', dailylog:'Daily Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline' };
+  const titles = { overview:'Overview', engagement:'Engagement', departments:'Departments', timeline:'Timeline' };
   document.getElementById('page-title').textContent = titles[sec] || sec;
   if (sec === 'engagement') renderEngagement();
-  if (sec === 'dailylog')   loadMgmtDailyLogs();
 };
 
 window.generateReport = async function() {
@@ -884,114 +887,7 @@ function loadScript(src) {
 }
 
 window.doSignOut = async () => { await signOut(auth); window.location.href = '../portal.html'; };
-
-// ══════════════════════════════════════════
-// DAILY LOG (read-only for management)
-// ══════════════════════════════════════════
-
-function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-window.loadMgmtDailyLogs = async function() {
-  try {
-    const snap = await getDocs(query(collection(db, 'dailyLogs'), orderBy('createdAt', 'desc')));
-    allDailyLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    populateMgmtDateFilter();
-    renderMgmtSummaryStrip();
-    renderMgmtDailyLogs();
-  } catch(e) {
-    document.getElementById('mgmt-daily-log-list').innerHTML =
-      `<div class="empty-state"><p style="color:var(--danger)">Failed to load logs: ${e.message}</p></div>`;
-  }
-};
-
-function populateMgmtDateFilter() {
-  const sel = document.getElementById('mgmt-dl-date-filter');
-  if (!sel) return;
-  const existing = sel.value;
-  const dates = [...new Set(allDailyLogs.map(l => {
-    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-    return d ? d.toISOString().split('T')[0] : null;
-  }).filter(Boolean))].sort().reverse();
-  sel.innerHTML = '<option value="">All dates</option>' +
-    dates.map(dk => {
-      const label = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-      return `<option value="${dk}" ${existing === dk ? 'selected' : ''}>${label}</option>`;
-    }).join('');
-}
-
-function renderMgmtSummaryStrip() {
-  const el = document.getElementById('dl-summary-strip');
-  if (!el) return;
-  const total    = allDailyLogs.length;
-  const onTrack  = allDailyLogs.filter(l => l.targetStatus === 'on-track').length;
-  const partial  = allDailyLogs.filter(l => l.targetStatus === 'partial').length;
-  const blocked  = allDailyLogs.filter(l => l.targetStatus === 'blocked').length;
-  el.innerHTML = `
-    <div class="metric-card"><div class="metric-label">Total logs</div><div class="metric-value">${total}</div><div class="metric-sub">All time</div></div>
-    <div class="metric-card"><div class="metric-label">On track</div><div class="metric-value" style="color:var(--accent)">${onTrack}</div><div class="metric-sub">Targets met</div></div>
-    <div class="metric-card"><div class="metric-label">Partial</div><div class="metric-value" style="color:var(--warn)">${partial}</div><div class="metric-sub">Partially achieved</div></div>
-    <div class="metric-card"><div class="metric-label">Blocked</div><div class="metric-value" style="color:var(--danger)">${blocked}</div><div class="metric-sub">Targets not met</div></div>`;
-}
-
-window.renderMgmtDailyLogs = function() {
-  const el = document.getElementById('mgmt-daily-log-list');
-  if (!el) return;
-  const filterDate   = document.getElementById('mgmt-dl-date-filter')?.value || '';
-  const filterStatus = document.getElementById('mgmt-dl-status-filter')?.value || '';
-  let list = allDailyLogs;
-  if (filterDate) {
-    list = list.filter(l => {
-      const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-      return d && d.toISOString().split('T')[0] === filterDate;
-    });
-  }
-  if (filterStatus) {
-    list = list.filter(l => l.targetStatus === filterStatus);
-  }
-  if (!list.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No logs matching this filter</p></div>';
-    return;
-  }
-  const statusMeta = {
-    'on-track': { label: 'On track',          color: 'var(--accent)',  icon: '🟢' },
-    'partial':  { label: 'Partially achieved', color: 'var(--warn)',    icon: '🟡' },
-    'blocked':  { label: 'Blocked / not met',  color: 'var(--danger)',  icon: '🔴' }
-  };
-  el.innerHTML = list.map(l => {
-    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-    const timeStr = d ? d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
-    const sm = statusMeta[l.targetStatus] || statusMeta['on-track'];
-    return `<div style="border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;background:var(--surface2)">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#1a7a35);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;flex-shrink:0">
-            ${(l.authorName||'C').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
-          </div>
-          <div>
-            <div style="font-size:13px;font-weight:600">${l.authorName || 'Coordinator'}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:1px">${timeStr}</div>
-          </div>
-        </div>
-        <span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px;background:rgba(0,0,0,0.25);color:${sm.color};border:1px solid ${sm.color}44">
-          ${sm.icon} ${sm.label}
-        </span>
-      </div>
-      <div style="margin-bottom:${l.targets ? '14px' : '0'}">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">📝 Daily Notes</div>
-        <div style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">${escapeHtml(l.notes || '')}</div>
-      </div>
-      ${l.targets ? `<div style="border-top:1px solid var(--border);padding-top:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">🎯 Targets &amp; Goals</div>
-        <div style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">${escapeHtml(l.targets)}</div>
-      </div>` : ''}
-    </div>`;
-  }).join('');
-};
 </script>
-
 
 <!-- ── LIGHT / DARK MODE ── -->
 <style>
