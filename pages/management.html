@@ -410,37 +410,94 @@ function renderTimeline() {
   document.getElementById('tl-scope-sub').textContent = isOverall
     ? 'All departments · Project milestone tracker'
     : 'Department-specific milestone tracker';
-  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall-scope completion' : `${currentTimelineScope} completion`;
+  document.getElementById('tl-pct-label').textContent = isOverall ? 'All departments completion' : `${currentTimelineScope} completion`;
 
   // Show/hide dept breakdown panel
   document.getElementById('tl-dept-breakdown').style.display = isOverall ? '' : 'none';
 
   const el = document.getElementById('timeline-list');
-  if (!phasesForScope.length) {
-    el.innerHTML = '<div class="text-sm text-muted">No phases added yet for this scope</div>';
-    document.getElementById('overall-pct').textContent = '0%';
-    document.getElementById('overall-bar').style.width = '0%';
-    document.getElementById('overall-sub').textContent = '—';
-  } else {
-    const done = phasesForScope.filter(p => p.status === 'done').length;
-    const pct = Math.round(done / phasesForScope.length * 100);
-    const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
-    document.getElementById('overall-pct').textContent = pct + '%';
-    document.getElementById('overall-bar').style.width = pct + '%';
-    document.getElementById('overall-bar').style.background = color;
-    document.getElementById('overall-sub').textContent = `${done} of ${phasesForScope.length} phases complete`;
-    el.innerHTML = phasesForScope.map(p => `
-      <div class="tl-item">
-        <div class="tl-dot ${p.status}"></div>
-        <div class="tl-body">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="tl-title">${p.name}</span>
-            ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+
+  if (isOverall) {
+    // ── Overall tab: show ALL phases grouped by department ──
+    if (!allTimeline.length) {
+      el.innerHTML = '<div class="text-sm text-muted">No phases added yet</div>';
+      document.getElementById('overall-pct').textContent = '0%';
+      document.getElementById('overall-bar').style.width = '0%';
+      document.getElementById('overall-sub').textContent = '—';
+    } else {
+      document.getElementById('overall-pct').textContent = gtPct + '%';
+      document.getElementById('overall-bar').style.width = gtPct + '%';
+      document.getElementById('overall-bar').style.background = gtColor;
+      document.getElementById('overall-sub').textContent = `${gtDone} of ${gtTotal} phases complete (all depts)`;
+
+      const globalPhases = allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '');
+      const deptPhases   = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
+      const depts        = [...new Set(deptPhases.map(p => p.scope))].sort();
+
+      const phaseItem = p => `
+        <div class="tl-item">
+          <div class="tl-dot ${p.status}"></div>
+          <div class="tl-body">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="tl-title">${p.name}</span>
+              ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+            </div>
+            <div class="tl-date">${p.date}</div>
+            <div class="tl-desc">${p.description}</div>
           </div>
-          <div class="tl-date">${p.date}</div>
-          <div class="tl-desc">${p.description}</div>
-        </div>
-      </div>`).join('');
+        </div>`;
+
+      const deptHeader = (name, items) => {
+        const d = items.filter(p => p.status === 'done').length;
+        const pct = items.length ? Math.round(d / items.length * 100) : 0;
+        const col = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;
+                  margin:18px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)">${name}</span>
+          <span style="font-size:11px;color:${col};font-weight:600">${d}/${items.length} done · ${pct}%</span>
+        </div>`;
+      };
+
+      let html = '';
+      if (globalPhases.length) {
+        html += deptHeader('Overall scope', globalPhases);
+        html += globalPhases.map(phaseItem).join('');
+      }
+      depts.forEach(d => {
+        const items = deptPhases.filter(p => p.scope === d);
+        html += deptHeader(d, items);
+        html += items.map(phaseItem).join('');
+      });
+      el.innerHTML = html;
+    }
+  } else {
+    // ── Department tab: show only that dept's phases ──
+    if (!phasesForScope.length) {
+      el.innerHTML = '<div class="text-sm text-muted">No phases added yet for this scope</div>';
+      document.getElementById('overall-pct').textContent = '0%';
+      document.getElementById('overall-bar').style.width = '0%';
+      document.getElementById('overall-sub').textContent = '—';
+    } else {
+      const done = phasesForScope.filter(p => p.status === 'done').length;
+      const pct = Math.round(done / phasesForScope.length * 100);
+      const color = pct === 100 ? 'var(--accent)' : pct > 50 ? 'var(--accent2)' : 'var(--warn)';
+      document.getElementById('overall-pct').textContent = pct + '%';
+      document.getElementById('overall-bar').style.width = pct + '%';
+      document.getElementById('overall-bar').style.background = color;
+      document.getElementById('overall-sub').textContent = `${done} of ${phasesForScope.length} phases complete`;
+      el.innerHTML = phasesForScope.map(p => `
+        <div class="tl-item">
+          <div class="tl-dot ${p.status}"></div>
+          <div class="tl-body">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="tl-title">${p.name}</span>
+              ${p.status==='done'?'<span class="badge badge-resolved">Done</span>':p.status==='wip'?'<span class="badge badge-progress">In progress</span>':'<span class="badge badge-doubt">Planned</span>'}
+            </div>
+            <div class="tl-date">${p.date}</div>
+            <div class="tl-desc">${p.description}</div>
+          </div>
+        </div>`).join('');
+    }
   }
 
   // Dept breakdown (only on Overall tab) — includes overall-scope row + grand total footer
