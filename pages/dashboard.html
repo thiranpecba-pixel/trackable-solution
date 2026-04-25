@@ -22,7 +22,6 @@
       <button class="nav-item" onclick="showSection('engagement',this)"><span class="icon">◈</span> Engagement</button>
       <button class="nav-item" onclick="showSection('departments',this)"><span class="icon">▦</span> Departments</button>
       <button class="nav-item" onclick="showSection('timeline',this)"><span class="icon">◫</span> Timeline</button>
-      <button class="nav-item" onclick="showSection('dailylog',this)"><span class="icon">📋</span> Daily Log</button>
       <div class="nav-label" style="margin-top:16px">Admin</div>
       <button class="nav-item" onclick="showSection('users',this)"><span class="icon">◉</span> Manage Users</button>
     </div>
@@ -209,6 +208,21 @@
 
           <!-- Right: completion stats -->
           <div>
+            <!-- Grand total card — always visible, aggregates ALL phases across all scopes -->
+            <div class="card mb-16" id="tl-grand-total-card" style="border-color:rgba(46,168,79,0.35);background:linear-gradient(135deg,rgba(46,168,79,0.06),transparent)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div class="section-title" style="color:var(--accent)">⊞ Grand total</div>
+                <span style="font-size:11px;color:var(--muted)" id="tl-grand-phase-count">— phases total</span>
+              </div>
+              <div style="font-size:36px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px;color:var(--accent)" id="tl-grand-pct">0%</div>
+              <div class="progress-bar mb-8" style="height:8px"><div class="progress-fill" id="tl-grand-bar" style="width:0%;background:var(--accent)"></div></div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+                <span style="font-size:11px;color:var(--accent)"><span id="tl-grand-done">0</span> done</span>
+                <span style="font-size:11px;color:var(--accent2)"><span id="tl-grand-wip">0</span> in progress</span>
+                <span style="font-size:11px;color:var(--muted)"><span id="tl-grand-plan">0</span> planned</span>
+              </div>
+            </div>
+
             <div class="card mb-16">
               <div class="section-title mb-8" id="tl-pct-label">Overall completion</div>
               <div style="font-size:36px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-2px;margin-bottom:8px" id="overall-pct">0%</div>
@@ -228,62 +242,6 @@
               <button class="btn btn-primary w-full" onclick="generateReport()">Download progress report</button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ══ DAILY LOG ══ -->
-      <div id="sec-dailylog" class="section-panel" style="display:none">
-
-        <!-- Compose card -->
-        <div class="card mb-16">
-          <div class="section-hdr mb-16">
-            <div>
-              <div class="section-title">📋 Daily Notes &amp; Targets</div>
-              <div class="section-sub">Log today's activity and set targets — visible to management</div>
-            </div>
-            <div style="font-size:12px;color:var(--muted)" id="dl-today-label"></div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Today's summary / notes</label>
-            <textarea class="form-textarea" id="dl-notes" rows="4"
-              placeholder="Summarise what happened today — sessions held, departments visited, issues raised, actions taken…"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Targets / goals for today</label>
-            <textarea class="form-textarea" id="dl-targets" rows="3"
-              placeholder="e.g. Follow up with Accounts dept, resolve 5 pending bugs, run training session for Warehouse…"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Target completion status</label>
-            <select class="form-select" id="dl-target-status" style="width:auto">
-              <option value="on-track">🟢 On track</option>
-              <option value="partial">🟡 Partially achieved</option>
-              <option value="blocked">🔴 Blocked / not met</option>
-            </select>
-          </div>
-
-          <div id="dl-compose-alert"></div>
-          <div class="modal-footer" style="padding:0;margin-top:12px;border:none">
-            <button class="btn btn-sm" onclick="loadDailyLogs()" style="color:var(--muted)">↺ Refresh</button>
-            <button class="btn btn-primary" id="dl-submit-btn" onclick="submitDailyLog()">Post daily log</button>
-          </div>
-        </div>
-
-        <!-- Log history -->
-        <div class="card">
-          <div class="section-hdr mb-16">
-            <div>
-              <div class="section-title">Log history</div>
-              <div class="section-sub">All posted daily notes — newest first</div>
-            </div>
-            <select class="form-select" style="width:auto;font-size:12px" id="dl-filter-date" onchange="renderDailyLogs()">
-              <option value="">All dates</option>
-            </select>
-          </div>
-          <div id="daily-log-list"><div class="empty-state"><div class="icon">📋</div><p>No logs posted yet</p></div></div>
         </div>
       </div>
 
@@ -432,7 +390,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, onSnapshot, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, emailjsConfig, DEPARTMENTS, FEEDBACK_TYPES, STATUS, formatDate, badge, deptColor, initials } from "../js/config.js";
 
 window.toggleTheme = function() {
@@ -456,7 +414,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [], allCheckins = [], allDailyLogs = [];
+let currentUser = null, allFeedback = [], allTimeline = [], allUsers = [], allDepts = [], allCheckins = [];
 let statusFilter = 'all', typeFilter = '', editingTimelineId = null;
 
 // ── Auth guard ──
@@ -691,6 +649,21 @@ function renderTimeline() {
     ? allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '')
     : allTimeline.filter(p => p.scope === currentTimelineScope);
 
+  // ── Grand total: ALL phases across every scope ──
+  const gtDone  = allTimeline.filter(p => p.status === 'done').length;
+  const gtWip   = allTimeline.filter(p => p.status === 'wip').length;
+  const gtPlan  = allTimeline.filter(p => p.status === 'plan').length;
+  const gtTotal = allTimeline.length;
+  const gtPct   = gtTotal ? Math.round(gtDone / gtTotal * 100) : 0;
+  const gtColor = gtPct === 100 ? 'var(--accent)' : gtPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+  document.getElementById('tl-grand-pct').textContent         = gtPct + '%';
+  document.getElementById('tl-grand-bar').style.width         = gtPct + '%';
+  document.getElementById('tl-grand-bar').style.background    = gtColor;
+  document.getElementById('tl-grand-phase-count').textContent = `${gtTotal} phase${gtTotal !== 1 ? 's' : ''} total`;
+  document.getElementById('tl-grand-done').textContent        = gtDone;
+  document.getElementById('tl-grand-wip').textContent         = gtWip;
+  document.getElementById('tl-grand-plan').textContent        = gtPlan;
+
   // Update headings
   document.getElementById('tl-scope-title').textContent = isOverall
     ? 'Overall — Trial & launch phases'
@@ -698,7 +671,7 @@ function renderTimeline() {
   document.getElementById('tl-scope-sub').textContent = isOverall
     ? 'All departments · Project milestone tracker'
     : `Department-specific milestone tracker`;
-  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall completion' : `${currentTimelineScope} completion`;
+  document.getElementById('tl-pct-label').textContent = isOverall ? 'Overall-scope completion' : `${currentTimelineScope} completion`;
 
   // Show/hide dept breakdown panel
   document.getElementById('tl-dept-breakdown').style.display = isOverall ? '' : 'none';
@@ -741,27 +714,45 @@ function renderTimeline() {
       </div>`).join('');
   }
 
-  // Dept breakdown (only on Overall tab)
+  // Dept breakdown (only on Overall tab) — includes overall-scope row + grand total footer
   if (isOverall) {
-    const deptPhases = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
-    const depts = [...new Set(deptPhases.map(p => p.scope))].sort();
-    const breakdownEl = document.getElementById('tl-dept-breakdown-list');
-    if (!depts.length) {
-      breakdownEl.innerHTML = '<div class="text-sm text-muted">No department-specific phases yet</div>';
+    const deptPhases    = allTimeline.filter(p => p.scope && p.scope !== 'overall' && p.scope !== '');
+    const depts         = [...new Set(deptPhases.map(p => p.scope))].sort();
+    const overallPhases = allTimeline.filter(p => !p.scope || p.scope === 'overall' || p.scope === '');
+    const breakdownEl   = document.getElementById('tl-dept-breakdown-list');
+
+    const makeRow = (label, items, clickScope, isOvRow, isTotalRow) => {
+      const rDone  = items.filter(p => p.status === 'done').length;
+      const rTotal = items.length;
+      const rPct   = rTotal ? Math.round(rDone / rTotal * 100) : 0;
+      const rColor = rPct === 100 ? 'var(--accent)' : rPct > 50 ? 'var(--accent2)' : 'var(--warn)';
+      const nameStyle = isTotalRow
+        ? 'font-size:13px;font-weight:700;color:var(--text)'
+        : isOvRow
+        ? 'font-size:13px;font-weight:500;color:var(--muted);font-style:italic'
+        : 'font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)';
+      const onclick = (!isTotalRow && !isOvRow && clickScope)
+        ? `onclick="switchTimelineScope('${clickScope.replace(/'/g, "\\'")}',null)"`
+        : '';
+      const prefix  = isTotalRow ? '⊞ ' : isOvRow ? '↳ ' : '';
+      const topBorder = isTotalRow ? 'padding-top:10px;border-top:1px solid var(--border);' : '';
+      return `<div style="margin-bottom:${isTotalRow ? 0 : 14}px;${topBorder}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+          <span style="${nameStyle}" ${onclick}>${prefix}${label}</span>
+          <span style="font-size:12px;color:${isTotalRow ? 'var(--text)' : 'var(--muted)'};${isTotalRow ? 'font-weight:600' : ''}">${rDone}/${rTotal} done</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${rPct}%;background:${rColor}"></div></div>
+      </div>`;
+    };
+
+    if (!overallPhases.length && !depts.length) {
+      breakdownEl.innerHTML = '<div class="text-sm text-muted">No phases yet across any department</div>';
     } else {
-      breakdownEl.innerHTML = depts.map(d => {
-        const items = deptPhases.filter(p => p.scope === d);
-        const dDone = items.filter(p => p.status === 'done').length;
-        const dPct = items.length ? Math.round(dDone / items.length * 100) : 0;
-        const dColor = dPct === 100 ? 'var(--accent)' : dPct > 50 ? 'var(--accent2)' : 'var(--warn)';
-        return `<div style="margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
-            <span style="font-size:13px;font-weight:500;cursor:pointer;color:var(--accent2)" onclick="switchTimelineScope('${d.replace(/'/g,"\\'")}',null)">${d}</span>
-            <span style="font-size:12px;color:var(--muted)">${dDone}/${items.length} done</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${dPct}%;background:${dColor}"></div></div>
-        </div>`;
-      }).join('');
+      let html = '';
+      if (overallPhases.length) html += makeRow('Overall-scope phases', overallPhases, null, true, false);
+      depts.forEach(d => { html += makeRow(d, deptPhases.filter(p => p.scope === d), d, false, false); });
+      if (allTimeline.length) html += makeRow('Grand total (all phases)', allTimeline, null, false, true);
+      breakdownEl.innerHTML = html;
     }
   }
 }
@@ -1495,10 +1486,9 @@ window.showSection = function(sec, el) {
   document.getElementById('sec-' + sec).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  const titles = { overview:'Overview', feedback:'Feedback Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline', dailylog:'Daily Log', users:'Manage Users' };
+  const titles = { overview:'Overview', feedback:'Feedback Log', engagement:'Engagement', departments:'Departments', timeline:'Timeline', users:'Manage Users' };
   document.getElementById('page-title').textContent = titles[sec] || sec;
   if (sec === 'engagement') { renderEngagement(); renderCheckinLog(); }
-  if (sec === 'dailylog')   { loadDailyLogs(); updateDailyLogDateLabel(); }
 };
 
 window.setStatusFilter = function(val, el) {
@@ -1676,143 +1666,6 @@ window.postThreadMessage = async function() {
   document.getElementById('thread-input').value = '';
   document.getElementById('thread-alert').innerHTML = '';
 };
-
-// ══════════════════════════════════════════
-// DAILY LOG
-// ══════════════════════════════════════════
-
-function updateDailyLogDateLabel() {
-  const el = document.getElementById('dl-today-label');
-  if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-}
-
-window.loadDailyLogs = async function() {
-  try {
-    const snap = await getDocs(query(collection(db, 'dailyLogs'), orderBy('createdAt', 'desc')));
-    allDailyLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    populateDailyLogDateFilter();
-    renderDailyLogs();
-  } catch(e) {
-    console.error('Daily logs load error:', e);
-  }
-};
-
-function populateDailyLogDateFilter() {
-  const sel = document.getElementById('dl-filter-date');
-  if (!sel) return;
-  // Collect unique date strings (YYYY-MM-DD)
-  const dates = [...new Set(allDailyLogs.map(l => {
-    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-    return d ? d.toISOString().split('T')[0] : null;
-  }).filter(Boolean))].sort().reverse();
-  const existing = sel.value;
-  sel.innerHTML = '<option value="">All dates</option>' +
-    dates.map(dk => {
-      const label = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-      return `<option value="${dk}" ${existing === dk ? 'selected' : ''}>${label}</option>`;
-    }).join('');
-}
-
-window.renderDailyLogs = function() {
-  const el = document.getElementById('daily-log-list');
-  if (!el) return;
-  const filterDate = document.getElementById('dl-filter-date')?.value || '';
-  let list = allDailyLogs;
-  if (filterDate) {
-    list = list.filter(l => {
-      const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-      return d && d.toISOString().split('T')[0] === filterDate;
-    });
-  }
-  if (!list.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No logs for this date</p></div>';
-    return;
-  }
-  const statusMeta = {
-    'on-track': { label: 'On track',          color: 'var(--accent)',  icon: '🟢' },
-    'partial':  { label: 'Partially achieved', color: 'var(--warn)',    icon: '🟡' },
-    'blocked':  { label: 'Blocked / not met',  color: 'var(--danger)',  icon: '🔴' }
-  };
-  el.innerHTML = list.map(l => {
-    const d = l.createdAt?.toDate ? l.createdAt.toDate() : l.createdAt ? new Date(l.createdAt) : null;
-    const timeStr = d ? d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
-    const sm = statusMeta[l.targetStatus] || statusMeta['on-track'];
-    const isOwn = l.authorId === currentUser?.uid;
-    return `<div style="border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;background:var(--surface2)">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)">${l.authorName || 'Coordinator'}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${timeStr}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(0,0,0,0.2);color:${sm.color};border:1px solid ${sm.color}33">
-            ${sm.icon} ${sm.label}
-          </span>
-          ${isOwn ? `<button class="btn btn-sm" style="color:var(--danger);padding:2px 8px;font-size:11px" onclick="deleteDailyLog('${l.id}')">✕</button>` : ''}
-        </div>
-      </div>
-      <div style="margin-bottom:12px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px">📝 Notes</div>
-        <div style="font-size:13px;line-height:1.65;color:var(--text);white-space:pre-wrap">${escapeHtml(l.notes || '')}</div>
-      </div>
-      ${l.targets ? `<div style="border-top:1px solid var(--border);padding-top:12px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px">🎯 Targets</div>
-        <div style="font-size:13px;line-height:1.65;color:var(--text);white-space:pre-wrap">${escapeHtml(l.targets)}</div>
-      </div>` : ''}
-    </div>`;
-  }).join('');
-};
-
-window.submitDailyLog = async function() {
-  const notes   = document.getElementById('dl-notes').value.trim();
-  const targets = document.getElementById('dl-targets').value.trim();
-  const targetStatus = document.getElementById('dl-target-status').value;
-  const alertEl = document.getElementById('dl-compose-alert');
-  alertEl.innerHTML = '';
-
-  if (!notes) {
-    alertEl.innerHTML = '<div class="alert alert-danger">Please write at least a summary note.</div>';
-    return;
-  }
-
-  const btn = document.getElementById('dl-submit-btn');
-  btn.disabled = true; btn.textContent = 'Posting…';
-
-  try {
-    await addDoc(collection(db, 'dailyLogs'), {
-      notes,
-      targets,
-      targetStatus,
-      authorId:   currentUser.uid,
-      authorName: currentUser.name || 'Coordinator',
-      createdAt:  serverTimestamp()
-    });
-    document.getElementById('dl-notes').value   = '';
-    document.getElementById('dl-targets').value = '';
-    document.getElementById('dl-target-status').value = 'on-track';
-    showAlert('Daily log posted and visible to management!', 'success');
-    await loadDailyLogs();
-  } catch(e) {
-    alertEl.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
-  }
-  btn.disabled = false; btn.textContent = 'Post daily log';
-};
-
-window.deleteDailyLog = async function(id) {
-  if (!confirm('Delete this daily log entry?')) return;
-  try {
-    await deleteDoc(doc(db, 'dailyLogs', id));
-    showAlert('Log entry deleted.', 'success');
-    await loadDailyLogs();
-  } catch(e) {
-    showAlert('Failed to delete: ' + e.message, 'danger');
-  }
-};
-
-function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
 
 function showAlert(msg, type) {
   const el = document.getElementById('alert-area');
