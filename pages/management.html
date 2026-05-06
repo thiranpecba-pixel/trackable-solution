@@ -116,8 +116,65 @@
 
         <div class="card">
           <div class="section-hdr mb-12">
-            <div><div class="section-title">Check-in log</div><div class="section-sub">Daily usage confirmations from workers</div></div>
+            <div><div class="section-title">Check-in log</div><div class="section-sub">Daily usage confirmations — filter by member &amp; period</div></div>
           </div>
+
+          <!-- ── Filter bar ── -->
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+
+            <!-- Period chips -->
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="filter-chip active" id="ci-period-all"   onclick="setCIPeriod('all',this)">All time</button>
+              <button class="filter-chip"        id="ci-period-day"   onclick="setCIPeriod('day',this)">Today</button>
+              <button class="filter-chip"        id="ci-period-week"  onclick="setCIPeriod('week',this)">This week</button>
+              <button class="filter-chip"        id="ci-period-month" onclick="setCIPeriod('month',this)">This month</button>
+            </div>
+
+            <!-- Member selector -->
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px">
+              <label style="font-size:11px;color:var(--muted);white-space:nowrap;text-transform:uppercase;letter-spacing:0.3px;font-weight:500">Member</label>
+              <select id="ci-member-select" onchange="renderCheckinLog()"
+                style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+                       padding:6px 10px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer">
+                <option value="">All members</option>
+              </select>
+            </div>
+
+            <!-- Result count badge -->
+            <span id="ci-result-count" style="font-size:11px;color:var(--muted);flex-shrink:0;font-family:'DM Mono',monospace"></span>
+          </div>
+
+          <!-- ── Per-member summary strip (shown when a member is selected) ── -->
+          <div id="ci-member-summary" style="display:none;margin-bottom:16px;padding:14px 16px;
+               border-radius:10px;background:var(--surface2);border:1px solid var(--border)">
+            <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+              <div>
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px">Member</div>
+                <div style="font-size:15px;font-weight:600" id="ci-sum-name">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px">Department</div>
+                <div style="font-size:14px;font-weight:500" id="ci-sum-dept">—</div>
+              </div>
+              <div style="margin-left:auto;display:flex;gap:20px;flex-wrap:wrap">
+                <div style="text-align:center">
+                  <div style="font-size:22px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)" id="ci-sum-count">0</div>
+                  <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px">Check-ins</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:22px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent2)" id="ci-sum-days">0</div>
+                  <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px">Active days</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:22px;font-weight:700;font-family:'DM Mono',monospace;color:var(--purple)" id="ci-sum-streak">0</div>
+                  <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px">Day streak</div>
+                </div>
+              </div>
+            </div>
+            <!-- Mini usage breakdown for this member in period -->
+            <div id="ci-sum-usage" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+          </div>
+
           <div id="eng-checkin-log"></div>
         </div>
       </div>
@@ -724,18 +781,178 @@ function renderEngagement() {
     alertCard.style.display = 'none';
   }
 
-  // Check-in log
-  const logEl = document.getElementById('eng-checkin-log');
-  if (!allCheckins.length) {
-    logEl.innerHTML = '<div class="text-sm text-muted">No check-ins yet</div>';
+  // ── Populate member dropdown ──
+  const memberSel = document.getElementById('ci-member-select');
+  if (memberSel) {
+    const members = [...new Set(allCheckins.map(c => c.submittedBy).filter(Boolean))].sort();
+    const prev = memberSel.value;
+    memberSel.innerHTML = '<option value="">All members</option>' +
+      members.map(m => `<option value="${m}"${m===prev?' selected':''}>${m}</option>`).join('');
+  }
+
+  renderCheckinLog();
+}
+
+// ── Check-in filter state ──
+let ciPeriod = 'all';
+
+window.setCIPeriod = function(period, btn) {
+  ciPeriod = period;
+  document.querySelectorAll('[id^="ci-period-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCheckinLog();
+};
+
+window.renderCheckinLog = function() {
+  const usageLabels = {
+    submitted_feedback: '📝 Submitted feedback',
+    checked_replies:    '💬 Checked IT replies',
+    tested_fix:         '🔍 Tested a fix',
+    general_use:        '💻 General use'
+  };
+
+  const memberSel  = document.getElementById('ci-member-select');
+  const selectedMember = memberSel ? memberSel.value : '';
+  const logEl      = document.getElementById('eng-checkin-log');
+  const countEl    = document.getElementById('ci-result-count');
+  const summaryEl  = document.getElementById('ci-member-summary');
+
+  // ── Date boundaries ──
+  const now   = new Date();
+  const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart   = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  function inPeriod(checkin) {
+    if (ciPeriod === 'all') return true;
+    if (!checkin.createdAt) return false;
+    const d = checkin.createdAt.toDate ? checkin.createdAt.toDate() : new Date(checkin.createdAt);
+    if (ciPeriod === 'day')   return d >= todayStart;
+    if (ciPeriod === 'week')  return d >= weekStart;
+    if (ciPeriod === 'month') return d >= monthStart;
+    return true;
+  }
+
+  let filtered = allCheckins.filter(c => {
+    if (selectedMember && c.submittedBy !== selectedMember) return false;
+    return inPeriod(c);
+  });
+
+  if (countEl) countEl.textContent = filtered.length + ' result' + (filtered.length !== 1 ? 's' : '');
+
+  // ── Per-member summary strip ──
+  if (summaryEl) {
+    if (selectedMember) {
+      summaryEl.style.display = '';
+      document.getElementById('ci-sum-name').textContent = selectedMember;
+
+      // Most frequent dept for this member
+      const deptCounts = {};
+      filtered.forEach(c => { if (c.dept) deptCounts[c.dept] = (deptCounts[c.dept]||0)+1; });
+      const topDept = Object.entries(deptCounts).sort((a,b)=>b[1]-a[1])[0];
+      document.getElementById('ci-sum-dept').textContent = topDept ? topDept[0] : '—';
+
+      // Active days (unique day keys)
+      const activeDays = new Set(filtered.map(c => {
+        if (!c.createdAt) return null;
+        const d = c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
+        return dayKey(d);
+      }).filter(Boolean));
+      document.getElementById('ci-sum-count').textContent = filtered.length;
+      document.getElementById('ci-sum-days').textContent  = activeDays.size;
+
+      // Streak: consecutive days up to today
+      const sortedDays = [...activeDays].sort().reverse();
+      let streak = 0;
+      let cursor = new Date(todayStart);
+      for (const dk of sortedDays) {
+        if (dk === dayKey(cursor)) { streak++; cursor.setDate(cursor.getDate()-1); }
+        else if (dk < dayKey(cursor)) break;
+      }
+      document.getElementById('ci-sum-streak').textContent = streak;
+
+      // Usage breakdown
+      const usageCounts = {};
+      filtered.forEach(c => { const k = c.usageType||'general_use'; usageCounts[k]=(usageCounts[k]||0)+1; });
+      document.getElementById('ci-sum-usage').innerHTML = Object.entries(usageCounts).map(([k,v])=>`
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;
+          padding:3px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--text)">
+          ${usageLabels[k]||'💻 Used system'}
+          <span style="font-weight:700;color:var(--accent);font-family:'DM Mono',monospace">${v}×</span>
+        </span>`).join('');
+    } else {
+      summaryEl.style.display = 'none';
+    }
+  }
+
+  if (!filtered.length) {
+    logEl.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--muted);font-size:13px">
+      ${allCheckins.length ? 'No check-ins match the current filter.' : 'No check-ins yet.'}
+    </div>`;
+    return;
+  }
+
+  // Group by member when showing all members, flat list when member selected
+  if (!selectedMember) {
+    // Group by member name
+    const byMember = {};
+    filtered.forEach(c => {
+      const m = c.submittedBy || 'Unknown';
+      if (!byMember[m]) byMember[m] = [];
+      byMember[m].push(c);
+    });
+    const memberNames = Object.keys(byMember).sort();
+
+    logEl.innerHTML = memberNames.map(m => {
+      const mCheckins = byMember[m];
+      const deptSet = [...new Set(mCheckins.map(c=>c.dept).filter(Boolean))].join(', ') || '—';
+      const rows = mCheckins.slice(0, 20).map(c => {
+        const d = c.createdAt?.toDate ? c.createdAt.toDate() : c.createdAt ? new Date(c.createdAt) : null;
+        const timeStr = d ? d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0 9px 18px;border-bottom:1px solid var(--border)">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px"></div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:12px;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted)">${c.dept || '—'}</span>
+              <span style="font-size:12px;color:var(--accent2)">${usageLabels[c.usageType] || '💻 Used system'}</span>
+              <span style="font-size:11px;color:var(--muted)">${timeStr}</span>
+            </div>
+            ${c.note ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;font-style:italic">"${escapeHtml(c.note)}"</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+      const extra = mCheckins.length > 20 ? `<div style="font-size:11px;color:var(--muted);padding:8px 0 4px 18px">+${mCheckins.length-20} more — select this member to see all</div>` : '';
+
+      return `<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+             background:var(--surface2);cursor:pointer"
+             onclick="
+               document.getElementById('ci-member-select').value='${m.replace(/'/g,"\\'")}';
+               renderCheckinLog()">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);
+                 display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent)">
+              ${m.split(' ').map(w=>w[0]||'').slice(0,2).join('').toUpperCase()}
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600">${escapeHtml(m)}</div>
+              <div style="font-size:11px;color:var(--muted)">${deptSet}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="text-align:right">
+              <div style="font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)">${mCheckins.length}</div>
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px">check-ins</div>
+            </div>
+            <span style="font-size:11px;color:var(--accent2);font-weight:500">View ›</span>
+          </div>
+        </div>
+        ${rows}${extra}
+      </div>`;
+    }).join('');
   } else {
-    const usageLabels = {
-      submitted_feedback: '📝 Submitted feedback',
-      checked_replies:    '💬 Checked IT replies',
-      tested_fix:         '🔍 Tested a fix',
-      general_use:        '💻 General use'
-    };
-    logEl.innerHTML = allCheckins.slice(0,40).map(c => {
+    // Flat list for selected member — show all
+    logEl.innerHTML = filtered.map(c => {
       const d = c.createdAt?.toDate ? c.createdAt.toDate() : c.createdAt ? new Date(c.createdAt) : null;
       const timeStr = d ? d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
       return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
@@ -743,16 +960,15 @@ function renderEngagement() {
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:500">${c.dept || '—'}</span>
-            <span style="font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted)">${c.submittedBy || 'Worker'}</span>
             <span style="font-size:11px;color:var(--accent2)">${usageLabels[c.usageType] || '💻 Used system'}</span>
             <span style="font-size:11px;color:var(--muted)">${timeStr}</span>
           </div>
-          ${c.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${c.note}"</div>` : ''}
+          ${c.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${escapeHtml(c.note)}"</div>` : ''}
         </div>
       </div>`;
     }).join('');
   }
-}
+};
 
 window.showSection = function(sec, el) {
   document.querySelectorAll('.section-panel').forEach(s => s.style.display = 'none');
